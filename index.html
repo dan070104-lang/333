@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Крест vs Земельный кодекс</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="wrap">
+    <h1>Битва: Крест против Земельного кодекса</h1>
+
+    <div id="hud">
+      <div class="bar-box">
+        <div class="name">Отец Аркадий (в кепке)</div>
+        <div class="bar"><div id="hp1" class="fill fill1"></div></div>
+      </div>
+      <div class="bar-box">
+        <div class="name">Землемер (без кепки)</div>
+        <div class="bar"><div id="hp2" class="fill fill2"></div></div>
+      </div>
+    </div>
+
+    <canvas id="game" width="900" height="480"></canvas>
+
+    <div id="overlay">
+      <div id="overlayInner">
+        <h2 id="overlayTitle"></h2>
+        <p id="overlayText"></p>
+        <button id="startBtn">Начать бой</button>
+      </div>
+    </div>
+
+    <p id="controls">
+      <b>Отец Аркадий (кепка):</b> A / D — движение, Пробел — бросить крест&nbsp;&nbsp;|&nbsp;&nbsp;
+      <b>Землемер (без кепки):</b> ← / → — движение, Enter — бросить земельный кодекс
+    </p>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
