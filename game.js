@@ -189,28 +189,57 @@ function drawBackground() {
   }
 }
 
-function drawCharacter(player, img, hasCap) {
+function drawCharacter(player, headImg, hasCap) {
+  const x = player.x;
   const y = GROUND_Y - CHAR_H;
+  const w = player.w;
+  const h = player.h;
+  const headR = w * 0.26;
+  const cx = x + w / 2;
+  const headCy = y + headR + 4;
+
   ctx.save();
   if (player.hurtFlash > 0) {
     ctx.filter = 'brightness(1.8) saturate(0.3)';
   }
-  if (img.ready) {
-    ctx.drawImage(img, player.x, y, player.w, player.h);
+
+  drawBody(x, y, w, h, headR, hasCap);
+
+  if (headImg.ready) {
+    drawHeadImage(headImg, cx, headCy, headR);
   } else {
-    drawFallbackCharacter(player.x, y, player.w, player.h, hasCap);
+    drawDefaultHead(cx, headCy, headR, hasCap);
   }
+
   ctx.restore();
 }
 
-function drawFallbackCharacter(x, y, w, h, hasCap) {
-  const headR = w * 0.22;
-  const cx = x + w / 2;
-  const headCy = y + headR + 4;
-
+function drawBody(x, y, w, h, headR, hasCap) {
   ctx.fillStyle = hasCap ? '#2f5d3a' : '#3a4a6b';
-  ctx.fillRect(x + w * 0.25, y + headR * 2, w * 0.5, h - headR * 2 - h * 0.15);
+  ctx.fillRect(x + w * 0.25, y + headR * 1.7, w * 0.5, h - headR * 1.7 - h * 0.15);
 
+  ctx.fillStyle = '#8a6b4d';
+  ctx.fillRect(x + w * 0.2, y + h - h * 0.15, w * 0.25, h * 0.15);
+  ctx.fillRect(x + w * 0.55, y + h - h * 0.15, w * 0.25, h * 0.15);
+}
+
+function drawHeadImage(img, cx, headCy, headR) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, headCy, headR, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(img, cx - headR, headCy - headR, headR * 2, headR * 2);
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.arc(cx, headCy, headR, 0, Math.PI * 2);
+  ctx.strokeStyle = '#00000055';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawDefaultHead(cx, headCy, headR, hasCap) {
   ctx.fillStyle = '#c9a179';
   ctx.beginPath();
   ctx.arc(cx, headCy, headR, 0, Math.PI * 2);
@@ -228,17 +257,17 @@ function drawFallbackCharacter(x, y, w, h, hasCap) {
     ctx.arc(cx, headCy - headR * 0.1, headR * 0.95, Math.PI, 0);
     ctx.fill();
   }
-
-  ctx.fillStyle = '#8a6b4d';
-  ctx.fillRect(x + w * 0.2, y + h - h * 0.15, w * 0.25, h * 0.15);
-  ctx.fillRect(x + w * 0.55, y + h - h * 0.15, w * 0.25, h * 0.15);
 }
 
 function drawProjectile(p) {
   const img = p.type === 'cross' ? assets.cross : assets.landCode;
-  const size = 34;
+  const size = 44;
   if (img.ready) {
-    ctx.drawImage(img, p.x - size / 2, p.y - size / 2, size, size);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(performance.now() / 300 * p.dir);
+    ctx.drawImage(img, -size / 2, -size / 2, size, size);
+    ctx.restore();
     return;
   }
   ctx.save();
