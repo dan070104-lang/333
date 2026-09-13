@@ -335,13 +335,34 @@ function availableSchemeIds(){
   if(S.vladosUnlocked) ids.push('vlados_deal');
   return ids;
 }
-// Навыки повышают доходность всех схем, но нелегальные (серые/скам/криминал) выигрывают от них
-// заметно сильнее, чем легальный фриланс — навык "прокачки" в первую очередь про умение вести
-// рискованные схемы, а не про честную работу, которая и так тарифицируется рынком.
+// Навыки — не шкала-ресурс вроде хвостов (которая гуляет вверх-вниз), а уровни: растут только
+// вперёд, юниты, вложенные в "Навыки" на неделе, определяют скорость набора опыта до следующего
+// уровня. Нелегальные схемы (серые/скам/криминал) выигрывают от уровня заметно сильнее легального
+// фриланса — навык "прокачки" в первую очередь про умение вести рискованные схемы.
+const SKILL_MAX_LEVEL = 5;
+function skillXpNeeded(level){ return 60 + 20*(level-1); } // XP, нужный чтобы дойти ДО этого уровня
+function addSkillXp(amount){
+  const r = S.resources;
+  r.skillXP = (r.skillXP||0) + amount;
+  let levelsGained = 0;
+  while(r.skillLevel < SKILL_MAX_LEVEL && r.skillXP >= skillXpNeeded(r.skillLevel+1)){
+    r.skillXP -= skillXpNeeded(r.skillLevel+1);
+    r.skillLevel += 1;
+    levelsGained++;
+  }
+  if(r.skillLevel>=SKILL_MAX_LEVEL) r.skillXP = 0;
+  return levelsGained;
+}
+function skillProgressPct(){
+  const r = S.resources;
+  if(r.skillLevel>=SKILL_MAX_LEVEL) return 100;
+  const need = skillXpNeeded(r.skillLevel+1);
+  return need>0 ? clamp(Math.round((r.skillXP/need)*100),0,100) : 0;
+}
 function skillBonus(cat){
-  const skill = S.resources.skill;
+  const frac = S.resources.skillLevel/SKILL_MAX_LEVEL;
   const isLegal = cat==='legal';
-  return { incomeBonus: skill/100*(isLegal?0.15:0.45), failCut: skill/100*(isLegal?0.15:0.5) };
+  return { incomeBonus: frac*(isLegal?0.15:0.45), failCut: frac*(isLegal?0.15:0.5) };
 }
 function schemeParams(id, units, tier){
   const s = SCHEMES[id];
@@ -422,7 +443,7 @@ function freshState(difficultyLevel){
     kryakovtsevFirstExpulsionUsed: false,
     kryakovtsevResignWeek: null,
     mobilizationAnnounced: false,
-    resources: { money: DIFFICULTY_PRESETS[level].startMoney, stress: 25, food: 60, tails: 8, escalation: 0, criminalRisk: 0, skill: 15 },
+    resources: { money: DIFFICULTY_PRESETS[level].startMoney, stress: 25, food: 60, tails: 8, escalation: 0, criminalRisk: 0, skillLevel: 0, skillXP: 0 },
     trust: { director:50, zemlekop:50, upp:45, vlados:0, arkadiy:0, kondratyuk:82 },
     crisisCounters: { tails:0, food:0, lifeNeglect:0 },
     firedEvents: {},
@@ -537,17 +558,22 @@ function resolveAllocTurn(){
   S.resources.stress = clamp(S.resources.stress + stressChange, 0, 100);
   lines.stress.push(`${stressBefore}→${S.resources.stress} (${parts.join(', ')})`);
 
-  // Навыки — растут от вложенных юнитов (эффект копится навсегда, не сбрасывается по неделям),
-  // без практики медленно ржавеют. Особенно окупаются на нелегальных схемах заработка.
+  // Навыки — не ресурс наподобие хвостов, а уровни: растут только вперёд, юниты, вложенные в
+  // "Навыки" на неделе, определяют только скорость набора опыта, не сам уровень напрямую.
+  // Без вложений опыт просто не растёт (никакого отката назад). Особенно окупаются на нелегальных схемах.
   const skillUnits = a.skill||0;
-  const skillBefore = S.resources.skill;
   if(skillUnits>0){
-    const skillGain = Math.round(effectiveUnits(skillUnits)*2.4);
-    S.resources.skill = clamp(S.resources.skill+skillGain,0,100);
-    lines.skill.push(`${skillBefore}→${S.resources.skill} (+${skillGain}, вложено ${skillUnits})`);
-  } else {
-    S.resources.skill = clamp(S.resources.skill-1,0,100);
-    lines.skill.push(`${skillBefore}→${S.resources.skill} (−1, без практики)`);
+    const xpGain = Math.round(effectiveUnits(skillUnits)*6);
+    const levelBefore = S.resources.skillLevel;
+    const levelsGained = addSkillXp(xpGain);
+    if(levelsGained>0){
+      lines.skill.push(`Навыки: новый уровень! ${levelBefore} → ${S.resources.skillLevel}/${SKILL_MAX_LEVEL} (+${xpGain} XP, вложено ${skillUnits}).`);
+    } else if(S.resources.skillLevel>=SKILL_MAX_LEVEL){
+      lines.skill.push(`Навыки: уровень уже максимальный (${SKILL_MAX_LEVEL}/${SKILL_MAX_LEVEL}).`);
+    } else {
+      const need = skillXpNeeded(S.resources.skillLevel+1);
+      lines.skill.push(`Навыки: +${xpGain} XP (${S.resources.skillXP}/${need} до уровня ${S.resources.skillLevel+1}, вложено ${skillUnits}).`);
+    }
   }
 
   // Отношения — дрейф и адресная подпитка
@@ -1146,17 +1172,22 @@ let selectedDifficulty = 'normal';
 function setDifficulty(level){ if(DIFFICULTY_PRESETS[level]) selectedDifficulty = level; render(); }
 function restartGame(){ clearSave(); S = freshState(); render(); }
 function startGame(){ clearSave(); S = freshState(selectedDifficulty); S.started = true; saveGame(); render(); startMusic(); }
-// Патчит сохранение, сделанное до появления поля "Навыки": в старом сейве
-// resources.skill/allocation.skill отсутствуют (undefined), а undefined в
-// арифметике даёт NaN, который затем расползается в деньги и еду через
-// skillBonus()/affordable — чинит корень (skill) и восстанавливает уже
-// испорченные деньги/еду, если они успели стать NaN до этого патча.
+// Патчит сохранения старых форматов "Навыков": самый ранний формат вообще не знал такого поля,
+// следующий хранил его как шкалу 0-100 (undefined/NaN там расползался в деньги и еду через
+// skillBonus()/affordable) — текущий формат хранит уровень (0-5) + XP внутри уровня. Заодно чинит
+// уже испорченные деньги/еду, если они успели стать NaN до появления этого патча.
 function migrateSave(s){
   if(!s.resources) s.resources = {};
   const r = s.resources;
-  if(typeof r.skill !== 'number' || isNaN(r.skill)) r.skill = 15;
   if(typeof r.money !== 'number' || isNaN(r.money)) r.money = (DIFFICULTY_PRESETS[s.difficulty] || DIFFICULTY_PRESETS.normal).startMoney;
   if(typeof r.food !== 'number' || isNaN(r.food)) r.food = 60;
+  if(typeof r.skillLevel !== 'number' || isNaN(r.skillLevel)){
+    const legacyScale = (typeof r.skill === 'number' && !isNaN(r.skill)) ? r.skill : 0; // старый формат 0-100
+    r.skillLevel = clamp(Math.floor(legacyScale/100*SKILL_MAX_LEVEL), 0, SKILL_MAX_LEVEL);
+    r.skillXP = 0;
+  }
+  if(typeof r.skillXP !== 'number' || isNaN(r.skillXP)) r.skillXP = 0;
+  delete r.skill;
   if(!s.allocation) s.allocation = {};
   if(typeof s.allocation.skill !== 'number' || isNaN(s.allocation.skill)) s.allocation.skill = 0;
   return s;
@@ -1259,7 +1290,7 @@ function render(){
       <p class="subtitle">${turnLabel} · ${weekLabel} · Ход события · Директор института: ${S.directorName}</p>
       <div class="topbar">
         ${statCard('Деньги', fmt(r.money)+'₽', Math.min(100,r.money/100000), false)}
-        ${statCard('Навыки', r.skill, r.skill, false)}
+        ${statCard('Навыки', `Ур. ${r.skillLevel}/${SKILL_MAX_LEVEL}`, skillProgressPct(), false)}
         ${statCard('Стресс', r.stress, r.stress, true)}
         ${statCard('Шаурма', r.food, r.food, false)}
         ${statCard('Хвосты', r.tails, r.tails, true)}
@@ -1283,7 +1314,7 @@ function render(){
 
     <div class="topbar">
       ${statCard('Деньги', fmt(r.money)+'₽', Math.min(100,r.money/100000), false)}
-      ${statCard('Навыки', r.skill, r.skill, false)}
+      ${statCard('Навыки', `Ур. ${r.skillLevel}/${SKILL_MAX_LEVEL}`, skillProgressPct(), false)}
       ${statCard('Стресс', r.stress, r.stress, true)}
       ${statCard('Шаурма', r.food, r.food, false)}
       ${statCard('Хвосты', r.tails, r.tails, true)}
@@ -1378,7 +1409,7 @@ function forecastInnerHtml(){
     прогноз: <span class="num">${fmt(forecast.low)}–${fmt(forecast.high)}₽</span><br>
     риск провала: <span class="risk">~${Math.round(forecast.fail*100)}%</span>
     ${s.cat==='legal' && tier>=2 ? `<div class="tier-note">Легальный рынок просел из-за эскалации.</div>`:''}
-    ${S.resources.skill>0 ? `<div class="tier-note">Навыки (${S.resources.skill}) уже дают доход ×${(1+sb.incomeBonus).toFixed(2)}, риск ×${(1-sb.failCut).toFixed(2)}${s.cat!=='legal'?' — на нелегальном заработке навык окупается сильнее':''}.</div>`:''}
+    ${S.resources.skillLevel>0 ? `<div class="tier-note">Навыки (ур. ${S.resources.skillLevel}/${SKILL_MAX_LEVEL}) уже дают доход ×${(1+sb.incomeBonus).toFixed(2)}, риск ×${(1-sb.failCut).toFixed(2)}${s.cat!=='legal'?' — на нелегальном заработке навык окупается сильнее':''}.</div>`:''}
     ${s.criminal ? `<div class="tier-note">Участие повышает уголовный риск независимо от исхода.</div>`:''}`;
 }
 
