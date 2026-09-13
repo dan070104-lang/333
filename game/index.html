@@ -865,6 +865,67 @@ function randomEventPool(){
     { id:'kondratyuk_move', build:()=>({ title:'Кондратюк просит помочь с переездом', kicker:'Кондратюк', text:'Перевозит вещи в другую комнату — просит помочь на пару часов.', choices:[
       { label:'Помочь', effect:()=>{ S.resources.stress=clamp(S.resources.stress+3,0,100); S.trust.kondratyuk=clamp(S.trust.kondratyuk+8,0,100); } },
       { label:'Занят', effect:()=>{} }
+    ]})},
+    // Дмитрий — тридцатилетний насельник общаги, копит на машину, пытается выглядеть круто, но его не замечают.
+    { id:'dmitriy_car_photos', build:()=>({ title:'Дмитрий показывает фото «той самой» машины', kicker:'Дмитрий', text:'Дмитрию скоро тридцать, а он в третий раз за месяц показывает скриншот объявления — говорит, что накопить осталось «буквально чуть-чуть».', choices:[
+      { label:'Похвалить выбор', effect:()=>{ S.resources.stress=clamp(S.resources.stress-3,0,100); } },
+      { label:'Свести к шутке', effect:()=>{ S.resources.stress=clamp(S.resources.stress-6,0,100); } }
+    ]})},
+    { id:'dmitriy_loan', build:()=>{ const amount=Math.round(rnd(3000,8000)); return { title:'Дмитрий просит занять «на машину»', kicker:'Дмитрий', text:`Смущённо просит перехватить ${fmt(amount)}₽ — совсем чуть-чуть не хватает до нужной суммы. Все в курсе, что это не в первый раз.`, choices:[
+      { label:'Дать в долг', effect:()=>{ S.resources.money=Math.max(0,S.resources.money-amount); } },
+      { label:'Отказать', effect:()=>{} }
+    ]};}},
+    { id:'dmitriy_ignored', build:()=>({ title:'Дмитрия опять не заметили', kicker:'Дмитрий', text:'Надел на общажную тусовку что-то «статусное» — и снова остался незамеченным. Подходит к Данилу с этим неловким видом.', choices:[
+      { label:'Поддержать', effect:()=>{ S.resources.stress=clamp(S.resources.stress-4,0,100); } },
+      { label:'Не обращать внимания', effect:()=>{} }
+    ]})},
+    // Бергман — прямолинейный радикальный неоязычник, который «ведает» истину.
+    { id:'bergman_preaching', build:()=>({ title:'Бергман «ведает»', kicker:'Бергман', text:'Прижимает Данила в коридоре и минут двадцать рассказывает про истинных богов и то, как правильно жить, — прямолинейно и без права на возражение.', choices:[
+      { label:'Выслушать из вежливости', effect:()=>{ S.resources.stress=clamp(S.resources.stress+5,0,100); } },
+      { label:'Возразить', effect:()=>{
+          if(Math.random()<0.4){ S.resources.stress=clamp(S.resources.stress+10,0,100); }
+          else { S.resources.stress=clamp(S.resources.stress-3,0,100); }
+        } }
+    ]})},
+    { id:'bergman_ritual', build:()=>({ title:'Приглашение на капище', kicker:'Бергман', text:'Зовёт на «настоящий» обряд за городом в эти выходные — говорит, это изменит взгляд на мир.', choices:[
+      { label:'Поехать ради интереса', effect:()=>{ S.resources.stress=clamp(S.resources.stress-8,0,100); } },
+      { label:'Отказаться', effect:()=>{} }
+    ]})},
+    // Курсокоп — зарабатывает в интернете на курсовых, иногда реально помогает с учёбой.
+    { id:'kursokop_help', build:()=>{ const cost=Math.round(rnd(8000,20000)); return { title:'Курсокоп предлагает помощь с хвостами', kicker:'Курсокоп', text:'Он пишет курсовые на заказ, но иногда просто по-человечески выручает — если заплатить, быстро закроет часть хвостов.', choices:[
+      { label:`Заплатить ${fmt(cost)}₽`, effect:()=>{ if(S.resources.money>=cost){ S.resources.money-=cost; S.resources.tails=clamp(S.resources.tails-15,0,100); } } },
+      { label:'Не сейчас', effect:()=>{} }
+    ]};}},
+    { id:'kursokop_advice', build:()=>({ title:'Курсокоп даёт бесплатный совет', kicker:'Курсокоп', text:'Неожиданно просто по-дружески объясняет, что сдавать в первую очередь и кого из преподов лучше не злить.', choices:[
+      { label:'Взять на заметку', effect:()=>{ S.resources.tails=clamp(S.resources.tails-6,0,100); } }
+    ]})},
+    // Богдан — постоянная мишень для троллинга, обладатель секретного конспекта про тестостерон.
+    { id:'bogdan_troll', build:()=>({ title:'Подколоть Богдана', kicker:'Богдан', text:'С утра опять качается в комнате и цитирует подкасты про «настоящих мужчин» — слишком удобная мишень, чтобы удержаться.', choices:[
+      { label:'Подколоть', effect:()=>{ S.resources.stress=clamp(S.resources.stress-6,0,100); } },
+      { label:'Не связываться', effect:()=>{} }
+    ]})},
+    { id:'bogdan_notes', build:()=>({ title:'Конспект про тестостерон', kicker:'Богдан', text:'У Богдана — толстая тетрадь с личным конспектом «про тестостерон», которую он никому не показывает. Пока он в душе, есть шанс полистать.', choices:[
+      { label:'Стащить полистать', effect:()=>{
+          if(Math.random()<0.5){ S.resources.stress=clamp(S.resources.stress+8,0,100); }
+          else { S.resources.stress=clamp(S.resources.stress-10,0,100); }
+        } },
+      { label:'Не рисковать', effect:()=>{} }
+    ]})},
+    // Назар — семнадцатилетний самопровозглашённый миллиардер и скамер, пьёт, нарциссирует.
+    { id:'nazar_brag', build:()=>({ title:'Назар в ударе', kicker:'Назар', text:'Ему семнадцать, но по его словам он уже почти миллиардер — рассказывает про очередную «сделку» с таким видом, будто сам в неё верит.', choices:[
+      { label:'Слушать байки', effect:()=>{ S.resources.stress=clamp(S.resources.stress-4,0,100); } },
+      { label:'Уйти от разговора', effect:()=>{} }
+    ]})},
+    { id:'nazar_deal', build:()=>{ const gain=Math.round(rnd(15000,40000)); const lost=Math.round(rnd(5000,15000)); return { title:'Назар зовёт «в долю»', kicker:'Назар', text:'Предлагает вложиться в новую схему — путано говорит про «инсайд» и «гарантированные иксы», явно сочиняя детали на ходу.', choices:[
+      { label:'Рискнуть небольшой суммой', effect:()=>{
+          if(Math.random()<0.6){ S.resources.money=Math.max(0,S.resources.money-lost); }
+          else { S.resources.money+=gain; }
+        } },
+      { label:'Не ввязываться', effect:()=>{} }
+    ]};}},
+    { id:'nazar_vouch', build:()=>({ title:'Назар просит подтвердить легенду', kicker:'Назар', text:'Просит перед новыми знакомыми подтвердить, что он и правда «ворочает миллионами» — иначе, по его словам, сделка сорвётся.', choices:[
+      { label:'Подыграть', effect:()=>{ S.resources.stress=clamp(S.resources.stress-3,0,100); } },
+      { label:'Не участвовать в цирке', effect:()=>{} }
     ]})}
   ];
   if(S.arkadiyUnlocked){
