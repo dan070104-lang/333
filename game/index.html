@@ -930,11 +930,12 @@ function sellItem(id){
   render();
 }
 function restartGame(){ clearSave(); S = freshState(); render(); }
-function startGame(){ clearSave(); S = freshState(); S.started = true; saveGame(); render(); }
+function startGame(){ clearSave(); S = freshState(); S.started = true; saveGame(); render(); startMusic(); }
 function continueGame(){
   const saved = loadGame();
   if(saved){ S = saved; S.started = true; render(); }
   else startGame();
+  startMusic();
 }
 
 /* ============ ВИЗУАЛЬНАЯ ДЕГРАДАЦИЯ ============ */
@@ -1213,6 +1214,16 @@ function toggleMusic(){
     audio.pause();
     btn.classList.remove('playing'); btn.textContent='♪';
   }
+}
+function startMusic(){
+  const audio = document.getElementById('bgm');
+  const btn = document.getElementById('bgm-toggle');
+  if(!audio || !btn || !audio.paused) return;
+  // вызывается из обработчика клика («Начать семестр»/«Продолжить») — это пользовательский
+  // жест, поэтому браузер не блокирует воспроизведение, в отличие от автозапуска на загрузке страницы
+  audio.play().then(()=>{
+    btn.classList.add('playing'); btn.textContent='❚❚';
+  }).catch(()=>{});
 }
 
 render();
