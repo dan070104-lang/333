@@ -384,9 +384,11 @@ function resolveAllocTurn(){
   const tier = escalationTier(S.resources.escalation);
   const lines = { money:[], stress:[], food:[], tails:[], trust:[], flags:[] };
 
-  // Учёба -> хвосты
+  // Учёба -> хвосты. Программа тяжелеет к концу семестра — фиксированная раскладка юнитов
+  // со временем перестаёт справляться, нужно наращивать вложение.
+  const weekFrac = clamp(S.week/MAX_WEEKS, 0, 1);
   const effStudy = effectiveUnits(a.study);
-  let tailsDelta = Math.round(9 - 6*effStudy);
+  let tailsDelta = Math.round((7 + 5*weekFrac) - 3.3*effStudy);
   if(S.shop.konspekt) tailsDelta -= 1;
   const tailsBefore = S.resources.tails;
   S.resources.tails = clamp(S.resources.tails + tailsDelta, 0, 100);
@@ -418,7 +420,7 @@ function resolveAllocTurn(){
   const lifeQuality = clamp(effLife/3.7, 0, 1); // 0..1, насколько эффективно тратит время на быт
   const foodCost = Math.round((3000 - 1500*lifeQuality) * priceMult(S.resources.escalation));
   const targetGain = 26;
-  const decay = Math.round(rnd(8,14));
+  const decay = Math.round(rnd(8,14) + 3*weekFrac);
   const affordable = Math.min(foodCost, S.resources.money);
   const spendRatio = foodCost>0 ? affordable/foodCost : 0;
   const foodGain = Math.round(targetGain*spendRatio);
@@ -445,10 +447,14 @@ function resolveAllocTurn(){
   if(S.shop.car){ S.resources.money = Math.max(0,S.resources.money-5000); lines.money.push('Содержание машины: −5 000₽'); }
   if(S.shop.apartment){ S.resources.money = Math.max(0,S.resources.money-6250); lines.money.push('Аренда квартиры: −6 250₽'); }
 
-  // Разгрузка -> стресс
+  // Разгрузка -> стресс. Базовая усталость растёт по ходу семестра, а разгрузка со временем
+  // (и с ростом эскалации) даёт всё меньшую отдачу — одного юнита надолго не хватит.
   const effRelief = effectiveUnits(a.relief);
-  let stressChange = 5 - Math.round(effRelief*7);
-  const parts = [`база +5`, `разгрузка −${Math.round(effRelief*7)}`];
+  const stressBase = Math.round(6 + 6*weekFrac);
+  const reliefMult = 1 - 0.05*(tier-1);
+  const reliefEffect = Math.round(effRelief*3.2*reliefMult);
+  let stressChange = stressBase - reliefEffect;
+  const parts = [`база +${stressBase}`, `разгрузка −${reliefEffect}`];
   if(S.resources.food===0){ stressChange += 12; parts.push('голод +12'); }
   if(tier===3){ stressChange += 3; parts.push('эскалация +3'); }
   if(tier===4){ stressChange += 6; parts.push('эскалация +6'); }
