@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Деканат — менеджмент-версия</title>
+<style>
+  :root{
+    --bg:#12151a;
+    --panel:#1b2028;
+    --panel-2:#20262f;
+    --border:#2c3340;
+    --text:#e6e8eb;
+    --text-dim:#9aa3b0;
+    --accent:#5fb0ff;
+    --good:#4fd17c;
+    --warn:#e8b93f;
+    --bad:#e05c5c;
+    --hue:0deg;
+    --sat:100%;
+    --tint:0;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    padding:16px;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    filter:hue-rotate(var(--hue)) saturate(var(--sat));
+    transition:filter 1.2s ease;
+  }
+  .app{max-width:1200px;margin:0 auto;position:relative;}
+  .app::after{
+    content:"";
+    position:fixed;inset:0;
+    pointer-events:none;
+    background:linear-gradient(rgba(200,40,40,var(--tint)),rgba(200,40,40,var(--tint)));
+    mix-blend-mode:multiply;
+    transition:background 1.2s ease;
+    z-index:50;
+  }
+  h1{font-size:1.15rem;margin:0 0 2px;font-weight:700;letter-spacing:.2px;}
+  .subtitle{color:var(--text-dim);font-size:.8rem;margin:0 0 14px;}
+  .topbar{
+    display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;
+  }
+  .stat{
+    background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:8px 10px;
+  }
+  .stat-label{font-size:.68rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.4px;display:flex;justify-content:space-between;}
+  .stat-value{font-size:1.05rem;font-weight:700;margin-top:2px;}
+  .bar{height:6px;border-radius:4px;background:#0d0f13;margin-top:6px;overflow:hidden;}
+  .bar>i{display:block;height:100%;border-radius:4px;}
+  .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;}
+  @media (max-width:880px){.grid{grid-template-columns:1fr;} .topbar{grid-template-columns:repeat(2,1fr);}}
+  .panel{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:14px 16px;margin-bottom:14px;
+  }
+  .panel h2{font-size:.85rem;margin:0 0 10px;color:var(--text);text-transform:uppercase;letter-spacing:.5px;}
+  .panel h2 small{color:var(--text-dim);text-transform:none;font-weight:400;letter-spacing:0;}
+  .slider-row{margin-bottom:12px;}
+  .slider-head{display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px;}
+  .slider-head b{font-weight:600;}
+  .slider-head span.eff{color:var(--text-dim);font-size:.72rem;}
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  .budget-line{
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:.85rem;padding-top:6px;border-top:1px dashed var(--border);margin-top:6px;
+  }
+  .budget-line b.over{color:var(--bad);}
+  .sub-options{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;}
+  .pill{
+    border:1px solid var(--border);background:var(--panel-2);color:var(--text-dim);
+    padding:4px 10px;border-radius:999px;font-size:.72rem;cursor:pointer;user-select:none;
+  }
+  .pill.active{background:var(--accent);color:#08131f;border-color:var(--accent);font-weight:600;}
+  .forecast-box{
+    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:.8rem;
+    line-height:1.5;
+  }
+  .forecast-box .num{font-weight:700;color:var(--accent);}
+  .forecast-box .risk{color:var(--warn);font-weight:600;}
+  .npc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .npc{
+    background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;
+  }
+  .npc-name{font-size:.78rem;font-weight:600;display:flex;justify-content:space-between;}
+  .npc-name span{color:var(--text-dim);font-weight:400;}
+  .npc input[type=range]{margin-top:6px;height:4px;}
+  .npc .lock{font-size:.65rem;color:var(--text-dim);margin-top:2px;display:block;}
+  button.confirm{
+    width:100%;padding:11px;border-radius:10px;border:none;background:var(--accent);color:#081522;
+    font-weight:700;font-size:.9rem;cursor:pointer;margin-top:6px;
+  }
+  button.confirm:disabled{background:#333b47;color:#767f8c;cursor:not-allowed;}
+  button.secondary{
+    background:var(--panel-2);color:var(--text);border:1px solid var(--border);
+    padding:9px 12px;border-radius:8px;cursor:pointer;font-size:.8rem;
+  }
+  .report{
+    background:var(--panel-2);border:1px solid var(--border);border-radius:10px;
+    padding:12px 14px;font-size:.85rem;line-height:1.6;white-space:pre-line;
+  }
+  .report .tag{
+    display:inline-block;font-size:.65rem;padding:1px 6px;border-radius:5px;margin-right:6px;
+    background:#2a3140;color:var(--text-dim);vertical-align:1px;
+  }
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;
+    z-index:100;padding:16px;
+  }
+  .modal{
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;max-width:460px;width:100%;
+    padding:20px;
+  }
+  .modal h3{margin:0 0 10px;font-size:1rem;}
+  .modal p{font-size:.86rem;line-height:1.55;color:var(--text-dim);white-space:pre-line;}
+  .modal .choices{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+  .modal .choices button{flex:1;min-width:120px;}
+  .endscreen{
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center;
+  }
+  .endscreen h2{font-size:1.3rem;margin-bottom:8px;}
+  .endscreen p{color:var(--text-dim);font-size:.9rem;line-height:1.6;white-space:pre-line;text-align:left;max-width:560px;margin:12px auto;}
+  .tier-note{font-size:.72rem;color:var(--warn);margin-top:4px;}
+  .warn-inline{color:var(--bad);font-size:.75rem;margin-top:6px;}
+  footer{text-align:center;color:var(--text-dim);font-size:.7rem;margin-top:20px;}
+  .restore-box{background:var(--panel-2);border:1px solid var(--bad);border-radius:10px;padding:12px;margin-bottom:14px;font-size:.82rem;}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+/* ============ КОНСТАНТЫ ============ */
+const MAX_WEEKS = 45;
+const BASE_BUDGET = 21;
+const DIM_COEF = [1,1,1,0.7,0.4,0.2]; // коэффициенты убывающей отдачи по номеру юнита
+const NPC_LABELS = { zemlekop:'Землекоп', upp:'Комиссия УПП', komendant:'Комендантша', director:'Директор', kondratyuk:'Кондратюк' };
+
+function effectiveUnits(n){
+  if(n<=0) return 0;
+  let sum=0;
+  for(let i=0;i<n;i++){
+    sum += i < DIM_COEF.length ? DIM_COEF[i] : 0.1;
+  }
+  return sum;
+}
+function escalationTier(esc){
+  if(esc<26) return 1;
+  if(esc<=50) return 2;
+  if(esc<=75) return 3;
+  return 4;
+}
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function rnd(a,b){ return a + Math.random()*(b-a); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function getIncomeParams(units, type, tier){
+  const eff = effectiveUnits(units);
+  let low, high, fail;
+  if(type==='legal'){ low=eff*1500; high=eff*4000; fail=Math.min(0.35,0.05+0.01*eff); }
+  else if(type==='gray'){ low=eff*2000; high=eff*9000; fail=Math.min(0.6,0.25+0.03*eff); }
+  else { low=eff*4000; high=eff*20000; fail=Math.min(0.78,0.35+0.05*eff); }
+  if(type==='legal'){
+    let mult=1;
+    if(tier===2) mult=0.7; else if(tier===3) mult=0.6; else if(tier===4) mult=0.5;
+    low*=mult; high*=mult;
+  }
+  return {low,high,fail};
+}
+function roundMoney(v){ return Math.round(v/500)*500; }
+
+/* ============ СОСТОЯНИЕ ============ */
+function freshState(){
+  return {
+    week: 1,
+    started: false,
+    ended: false,
+    gameOver: null,
+    directorName: 'Лазор',
+    studentStatus: true,
+    restorations: 0,
+    mobilizationAnnounced: false,
+    conscriptionWeek: null,
+    resources: { money: 4000, stress: 25, food: 65, tails: 8, escalation: 0 },
+    trust: { zemlekop:50, upp:45, komendant:55, director:50, kondratyuk:82 },
+    crisisCounters: { tails:0, food:0, stress:0 },
+    breakdownChance: 0,
+    firedEvents: {},
+    modalQueue: [],
+    modal: null,
+    allocation: { study:4, income:4, life:4, relations:0, relief:0 },
+    incomeType: 'gray',
+    relationSplit: { zemlekop:0, upp:0, komendant:0, director:0, kondratyuk:0 },
+    log: []
+  };
+}
+let S = freshState();
+
+/* ============ ПРАВИЛА БЮДЖЕТА ============ */
+function budgetFor(state){ return BASE_BUDGET; }
+function minLifeFor(state){ return escalationTier(state.resources.escalation) >= 4 ? 4 : 0; }
+function allocSum(a){ return a.study+a.income+a.life+a.relations+a.relief; }
+
+/* ============ НЕДЕЛЬНОЕ РАЗРЕШЕНИЕ ============ */
+function resolveWeek(){
+  const a = S.allocation;
+  const tier = escalationTier(S.resources.escalation);
+  const lines = [];
+
+  // Учёба -> хвосты
+  const effStudy = effectiveUnits(a.study);
+  const tailsDelta = Math.round(6 - 5*effStudy);
+  S.resources.tails = clamp(S.resources.tails + tailsDelta, 0, 100);
+  if(tailsDelta<0) lines.push(`Учёба: хвосты сократились на ${-tailsDelta}.`);
+  else if(tailsDelta>0) lines.push(`Учёба: хвосты выросли на ${tailsDelta} — пар посещалось слишком мало.`);
+  else lines.push(`Учёба: без изменений — на грани.`);
+
+  // Заработок
+  let moneyDelta = 0;
+  if(a.income>0){
+    const p = getIncomeParams(a.income, S.incomeType, tier);
+    const failed = Math.random() < p.fail;
+    if(failed){
+      moneyDelta = Math.round(roundMoney(p.low*0.15));
+      S.resources.stress = clamp(S.resources.stress+10,0,100);
+      const failText = {
+        legal: 'Заказ сорвался, клиент не заплатил вовремя.',
+        gray: 'Схема прогорела — пришлось откатывать назад, почти без выхлопа.',
+        scam: 'Разводка не прошла — Данила чуть не спалили, доверие Землекопа просело.'
+      }[S.incomeType];
+      lines.push(`Заработок (${incomeLabel(S.incomeType)}): ${failText} +${moneyDelta.toLocaleString('ru-RU')}₽, стресс +10.`);
+      if(S.incomeType==='scam'){ S.trust.zemlekop = clamp(S.trust.zemlekop-5,0,100); }
+    } else {
+      moneyDelta = Math.round(roundMoney(rnd(p.low,p.high)));
+      lines.push(`Заработок (${incomeLabel(S.incomeType)}): схема выгорела, +${moneyDelta.toLocaleString('ru-RU')}₽.`);
+    }
+    S.resources.money = Math.max(0, S.resources.money + moneyDelta);
+  }
+
+  // Быт -> шаурма
+  const effLife = effectiveUnits(a.life);
+  const decay = Math.round(rnd(5,8));
+  const foodGain = Math.round(effLife*12);
+  const foodBefore = S.resources.food;
+  S.resources.food = clamp(S.resources.food - decay + foodGain, 0, 100);
+  lines.push(`Быт: сытость ${foodBefore}→${S.resources.food} (естественный расход −${decay}, забота +${foodGain}).`);
+
+  // Разгрузка -> стресс
+  const effRelief = effectiveUnits(a.relief);
+  let stressChange = 3 - Math.round(effRelief*4);
+  if(S.resources.food===0) stressChange += 10;
+  if(tier===3) stressChange += 2;
+  if(tier===4) stressChange += 4;
+  const stressBefore = S.resources.stress;
+  S.resources.stress = clamp(S.resources.stress + stressChange, 0, 100);
+  lines.push(`Стресс: ${stressBefore}→${S.resources.stress}.`);
+
+  // Отношения
+  const relEntries = Object.keys(NPC_LABELS);
+  let touched = [];
+  relEntries.forEach(k=>{
+    const units = S.relationSplit[k]||0;
+    if(units>0){
+      const gain = Math.round(units*9);
+      S.trust[k] = clamp(S.trust[k]+gain,0,100);
+      touched.push(`${NPC_LABELS[k]} +${gain}`);
+    } else {
+      S.trust[k] = clamp(S.trust[k]-2,0,100);
+    }
+  });
+  if(touched.length) lines.push(`Отношения: ${touched.join(', ')}. Остальные контакты слегка остыли.`);
+  else lines.push(`Отношения: на этой неделе не было времени ни на кого — все связи немного просели.`);
+
+  // Кондратюк — фоновый дрейф собственного состояния
+  if(!S.relationSplit.kondratyuk){
+    S.trust.kondratyuk = clamp(S.trust.kondratyuk - 1, 0, 100);
+  }
+  maybeKondratyukNarrative(lines);
+
+  // Эскалация — фиксированный график + шум
+  const escBefore = S.resources.escalation;
+  S.resources.escalation = clamp(S.resources.escalation + 1 + Math.round(rnd(0,1)), 0, 100);
+
+  S.week += 1;
+
+  // Кризисные счётчики
+  S.crisisCounters.tails = S.resources.tails>=60 ? S.crisisCounters.tails+1 : 0;
+  S.crisisCounters.food = S.resources.food===0 ? S.crisisCounters.food+1 : 0;
+  S.crisisCounters.stress = S.resources.stress>=90 ? S.crisisCounters.stress+1 : 0;
+
+  checkStoryEvents(lines);
+  checkCrises(lines);
+
+  S.log.unshift({ week: S.week-1, text: lines.join('\n') });
+  if(S.log.length>30) S.log.pop();
+
+  if(!S.gameOver && S.week>MAX_WEEKS){
+    finishGame();
+  }
+}
+
+function incomeLabel(t){ return t==='legal'?'легальная': t==='gray'?'серая зона':'скам'; }
+
+function maybeKondratyukNarrative(lines){
+  const k = S.trust.kondratyuk;
+  if(k<=70 && !S.firedEvents.kond70){ S.firedEvents.kond70=true; lines.push('Фон: Кондратюк выглядит подавленным — баланс явно не сходится, но он ещё шутит про это.'); }
+  if(k<=40 && !S.firedEvents.kond40){ S.firedEvents.kond40=true; lines.push('Фон: Кондратюк почти не появляется — судя по всему, дела совсем плохи.'); }
+  if(k<=15 && !S.firedEvents.kond15){ S.firedEvents.kond15=true; lines.push('Фон: Кондратюк пропал на несколько дней. Данилу становится не по себе от этой новости.'); S.resources.stress=clamp(S.resources.stress+5,0,100); }
+}
+
+/* ============ СЮЖЕТНЫЕ СОБЫТИЯ ============ */
+function checkStoryEvents(lines){
+  const w = S.week;
+  if(w===8 && !S.firedEvents.lazor){
+    S.firedEvents.lazor = true;
+    S.resources.escalation = clamp(S.resources.escalation+5,0,100);
+    S.directorName = 'Кряковцев';
+    S.trust.director = Math.round(S.trust.director*0.7);
+    queueModal({
+      title:'Смена директора',
+      text:'Лазор увольняют с поста директора общежития. Кабинет занимает Кряковцев — новый человек, новые порядки, старые связи почти ничего не стоят.',
+      choices:[{label:'Понятно', effect:()=>{}}]
+    });
+  }
+  if(w===16 && !S.firedEvents.drones){
+    S.firedEvents.drones = true;
+    S.resources.escalation = clamp(S.resources.escalation+8,0,100);
+    queueModal({
+      title:'БПЛА-контракты',
+      text:'В городе появляются подряды, связанные со сборкой и обслуживанием дронов. Деньги быстрые, но схема заметно рискованнее прежних раскладов серой зоны.',
+      choices:[{label:'Взять на заметку', effect:()=>{}}]
+    });
+  }
+  if(w===22 && !S.firedEvents.vasilina){
+    S.firedEvents.vasilina = true;
+    S.directorName = 'Василина';
+    S.trust.director = Math.round(S.trust.director*0.85);
+    queueModal({
+      title:'Ещё одна смена директора',
+      text:'Кряковцева переводят в другой корпус. За стол садится Василина — держится спокойнее, но присматривается ко всем заново.',
+      choices:[{label:'Понятно', effect:()=>{}}]
+    });
+  }
+  if(w===28 && !S.firedEvents.mobilization){
+    S.firedEvents.mobilization = true;
+    S.mobilizationAnnounced = true;
+    S.resources.escalation = clamp(S.resources.escalation+15,0,100);
+    S.conscriptionWeek = w+3;
+    queueModal({
+      title:'Объявлена мобилизация',
+      text:'По стране объявляют мобилизацию. В общежитии только об этом и разговоры. Бронь студента внезапно перестаёт быть формальностью — если Данил вылетит из университета сейчас, документы решат всё.',
+      choices:[{label:'Принять к сведению', effect:()=>{}}]
+    });
+  }
+  if(S.mobilizationAnnounced && S.conscriptionWeek===w && !S.firedEvents.conscriptionCheck){
+    S.firedEvents.conscriptionCheck = true;
+    if(!S.studentStatus){
+      endGame('over','Потеря брони','Комиссия сверяет списки студентов с приказом об отчислении. Данил в списке отчисленных. Через неделю приходит повестка — бронь больше не действует.');
+    } else {
+      queueModal({ title:'Проверка призывной комиссии', text:'Списки сверены. Данил всё ещё числится студентом — бронь действует. Пронесло, на этот раз.', choices:[{label:'Выдохнуть', effect:()=>{}}] });
+    }
+  }
+  // случайное нетворкинг-предложение
+  if(w>=5 && S.modalQueue.length===0 && Math.random()<0.12){
+    const bonus = Math.round(rnd(15000,45000));
+    queueModal({
+      title:'Нетворкинг-предложение',
+      text:`Знакомый предлагает разовую подработку — сразу ${bonus.toLocaleString('ru-RU')}₽ на руки, но нужно потратить вечер и слегка подпортить отношения с кем-то из комиссии УПП (это ударит по доверию).`,
+      choices:[
+        { label:'Согласиться', effect:()=>{ S.resources.money+=bonus; S.trust.upp=clamp(S.trust.upp-8,0,100); } },
+        { label:'Отказаться', effect:()=>{} }
+      ]
+    });
+  }
+}
+
+function checkCrises(lines){
+  if(S.crisisCounters.tails>=2 && !S.gameOver){
+    S.crisisCounters.tails=0;
+    const relevantTrust = Math.min(S.trust.upp, S.trust.director);
+    const pass = relevantTrust>=30;
+    if(pass){
+      S.resources.tails = clamp(S.resources.tails-25,0,100);
+      queueModal({ title:'Вызов на комиссию', text:`Хвосты накопились настолько, что вызывают на комиссию УПП. ${S.directorName===S.directorName?'':''}Связи и объяснения сработали — дают ещё один шанс закрыть долги.`, choices:[{label:'Выдохнуть', effect:()=>{}}] });
+    } else {
+      S.studentStatus = false;
+      queueModal({ title:'Отчисление', text:`Комиссия непреклонна: доверие к Данилу слишком низкое, объяснения не помогли. Приказ об отчислении подписан.`, choices:[{label:'...', effect:()=>{}}] });
+    }
+  }
+  if(S.crisisCounters.food>=2 && !S.gameOver){
+    S.resources.stress = clamp(S.resources.stress+25,0,100);
+    S.resources.food = 12;
+    queueModal({ title:'Кризис голода', text:'Вторая неделя без нормальной еды. Данил на грани — организм не выдерживает такого режима. Комендантша, заметив состояние, суёт пачку доширака.', choices:[{label:'Понятно', effect:()=>{}}] });
+    if(S.crisisCounters.food>=4){
+      endGame('over','Истощение','Организм не выдержал многонедельного голода. Данила увозят на скорой — доучиться в этом семестре уже не получится.');
+    }
+  }
+  if(S.crisisCounters.stress>=3 && !S.gameOver){
+    S.breakdownChance = clamp(S.breakdownChance+0.15, 0, 0.9);
+    if(Math.random()<S.breakdownChance){
+      endGame('over','Срыв','Недели на пределе стресса дают о себе знать. Срыв — и дальше уже не до университета.');
+    } else {
+      queueModal({ title:'На грани', text:'Стресс держится на критическом уровне уже несколько недель подряд. Пока держится — но это не может продолжаться бесконечно.', choices:[{label:'Держаться', effect:()=>{}}] });
+    }
+  } else if(S.resources.stress<90){
+    S.breakdownChance = 0;
+  }
+}
+
+function queueModal(m){ S.modalQueue.push(m); }
+function popModalIfNeeded(){
+  if(!S.modal && S.modalQueue.length>0 && !S.gameOver){
+    S.modal = S.modalQueue.shift();
+  }
+  if(S.gameOver && S.modal===null){ /* game over screen handled separately */ }
+}
+
+function endGame(kind, title, text){
+  S.gameOver = { kind, title, text };
+  S.ended = true;
+}
+
+function finishGame(){
+  const money = S.resources.money;
+  const avgTrust = Math.round(Object.values(S.trust).reduce((a,b)=>a+b,0)/5);
+  let title, text;
+  if(money>3000000){
+    title='Диплом и капитал';
+    text=`Данил доходит до диплома с деньгами на счету (${money.toLocaleString('ru-RU')}₽). Схемы того стоили — вопрос в том, какой ценой это далось лично ему.`;
+  } else if(avgTrust>=65){
+    title='Диплом на связях';
+    text='Данил доучивается без взлётов, зато почти со всеми в общаге и деканате сохранились нормальные отношения. Не самый громкий, зато устойчивый результат.';
+  } else if(S.resources.stress>=70){
+    title='Диплом на измотанных нервах';
+    text='Данил дотягивает до диплома, но на пределе — три года выжимали досуха. Формально всё получилось.';
+  } else {
+    title='Просто диплом';
+    text='Ни взлётов, ни катастроф — Данил ровно дотянул семестры до диплома, стараясь никого не подвести и не потерять себя окончательно.';
+  }
+  endGame('win', title, text);
+}
+
+/* ============ ДЕЙСТВИЯ UI ============ */
+function setAlloc(key, val){
+  S.allocation[key] = clamp(parseInt(val)||0, 0, 21);
+  if(key==='relations'){
+    const cap = S.allocation.relations;
+    let sum = Object.values(S.relationSplit).reduce((a,b)=>a+b,0);
+    if(sum>cap){
+      // урезаем пропорционально сверху вниз
+      let excess = sum-cap;
+      for(const k of Object.keys(S.relationSplit)){
+        if(excess<=0) break;
+        const cut = Math.min(S.relationSplit[k], excess);
+        S.relationSplit[k]-=cut; excess-=cut;
+      }
+    }
+  }
+  render();
+}
+function setRelation(npc, val){
+  const v = clamp(parseInt(val)||0,0,21);
+  const others = Object.keys(S.relationSplit).filter(k=>k!==npc).reduce((a,k)=>a+S.relationSplit[k],0);
+  const cap = S.allocation.relations;
+  S.relationSplit[npc] = Math.min(v, Math.max(0, cap-others));
+  render();
+}
+function setIncomeType(t){ S.incomeType = t; render(); }
+function confirmWeek(){
+  if(!validAllocation()) return;
+  resolveWeek();
+  popModalIfNeeded();
+  render();
+}
+function validAllocation(){
+  const sum = allocSum(S.allocation);
+  if(sum>budgetFor(S)) return false;
+  if(S.allocation.relations !== Object.values(S.relationSplit).reduce((a,b)=>a+b,0)) return false;
+  if(S.allocation.life < minLifeFor(S)) return false;
+  return true;
+}
+function closeModal(choice){
+  if(choice && choice.effect) choice.effect();
+  S.modal = null;
+  popModalIfNeeded();
+  render();
+}
+function tryRestore(){
+  const cost = restoreCost();
+  if(S.resources.money>=cost){
+    S.resources.money -= cost;
+    S.studentStatus = true;
+    S.resources.tails = 50;
+    S.restorations += 1;
+    S.log.unshift({ week:S.week, text:`Данил восстанавливается в университете за ${cost.toLocaleString('ru-RU')}₽. Хвосты частично сохраняются (50).` });
+    render();
+  }
+}
+function restoreCost(){
+  const tier = escalationTier(S.resources.escalation);
+  let base = 150000 * Math.pow(1.8, S.restorations);
+  if(tier===3) base *= 1.5;
+  if(tier===4) base *= 2;
+  return Math.round(base/1000)*1000;
+}
+function restartGame(){ S = freshState(); render(); }
+function startGame(){ S.started = true; render(); }
+
+/* ============ ВИЗУАЛЬНАЯ ДЕГРАДАЦИЯ ============ */
+function applyVisualTier(){
+  const tier = escalationTier(S.resources.escalation);
+  const root = document.documentElement;
+  const map = { 1:['0deg','100%',0], 2:['-8deg','85%',0.03], 3:['-18deg','65%',0.08], 4:['-28deg','45%',0.14] };
+  const [hue,sat,tint] = map[tier];
+  root.style.setProperty('--hue',hue);
+  root.style.setProperty('--sat',sat);
+  root.style.setProperty('--tint',tint);
+}
+
+/* ============ РЕНДЕР ============ */
+function barColor(value, invert){
+  const good = invert ? value<40 : value>60;
+  const mid = invert ? value<70 : value>30;
+  if(good) return 'var(--good)';
+  if(mid) return 'var(--warn)';
+  return 'var(--bad)';
+}
+
+function render(){
+  applyVisualTier();
+  const app = document.getElementById('app');
+
+  if(!S.started){
+    app.innerHTML = `
+      <h1>Деканат — менеджмент-версия</h1>
+      <p class="subtitle">Недельный дашборд управления временем Данила. ${MAX_WEEKS} недель, 21 юнит времени в неделю, никакой прокачки без компромиссов.</p>
+      <div class="panel">
+        <p style="font-size:.85rem;color:var(--text-dim);line-height:1.6">
+        Каждую неделю ты распределяешь ограниченный бюджет юнитов времени между учёбой, заработком, бытом,
+        отношениями и разгрузкой. Перекос в одну категорию математически невыгоден — отдача с каждым
+        следующим юнитом падает. Кризисы наступают не от одной ошибки, а когда показатели держатся
+        за критическим порогом несколько недель подряд.
+        </p>
+        <button class="confirm" onclick="startGame()">Начать семестр</button>
+      </div>
+      <footer>Прототип по GDD «Деканат» — менеджмент-версия. Локальная симуляция, без сервера.</footer>
+    `;
+    return;
+  }
+
+  if(S.gameOver){
+    const kindColor = S.gameOver.kind==='win' ? 'var(--good)' : 'var(--bad)';
+    app.innerHTML = `
+      <h1>Деканат — менеджмент-версия</h1>
+      <div class="endscreen">
+        <h2 style="color:${kindColor}">${S.gameOver.title}</h2>
+        <p>${S.gameOver.text}</p>
+        <p style="font-size:.78rem;color:var(--text-dim)">Неделя: ${S.week-1}/${MAX_WEEKS} · Деньги: ${S.resources.money.toLocaleString('ru-RU')}₽ · Стресс: ${S.resources.stress} · Эскалация: ${S.resources.escalation}</p>
+        <button class="secondary" onclick="restartGame()">Начать заново</button>
+      </div>
+    `;
+    return;
+  }
+
+  const r = S.resources;
+  const tier = escalationTier(r.escalation);
+  const sum = allocSum(S.allocation);
+  const budget = budgetFor(S);
+  const remaining = budget - sum;
+  const valid = validAllocation();
+  const relSum = Object.values(S.relationSplit).reduce((a,b)=>a+b,0);
+
+  const forecast = S.allocation.income>0 ? getIncomeParams(S.allocation.income, S.incomeType, tier) : null;
+
+  app.innerHTML = `
+    <h1>Деканат — менеджмент-версия</h1>
+    <p class="subtitle">Неделя ${S.week} / ${MAX_WEEKS} · Директор общежития: ${S.directorName} · ${S.studentStatus? 'Статус: студент' : 'Статус: ОТЧИСЛЕН'}</p>
+
+    <div class="topbar">
+      ${statCard('Деньги', r.money.toLocaleString('ru-RU')+'₽', Math.min(100,r.money/100000), false)}
+      ${statCard('Стресс', r.stress, r.stress, true)}
+      ${statCard('Шаурма', r.food, r.food, false)}
+      ${statCard('Хвосты', r.tails, r.tails, true)}
+      ${statCard('Эскалация', r.escalation+' (ур.'+tier+')', r.escalation, true)}
+    </div>
+
+    ${!S.studentStatus ? `
+      <div class="restore-box">
+        <b>Данил отчислен.</b> Восстановление стоит ${restoreCost().toLocaleString('ru-RU')}₽ (растёт с каждым разом и с эскалацией).
+        <div style="margin-top:8px;"><button class="secondary" ${r.money<restoreCost()?'disabled':''} onclick="tryRestore()">Восстановиться (${restoreCost().toLocaleString('ru-RU')}₽)</button></div>
+      </div>
+    ` : ''}
+
+    <div class="grid">
+      <div>
+        <div class="panel">
+          <h2>Распределение юнитов <small>осталось: ${remaining}/${budget}</small></h2>
+          ${sliderRow('study','Учёба', S.allocation.study)}
+          ${sliderRow('income','Заработок', S.allocation.income)}
+          <div class="sub-options">
+            ${incomePill('legal','Легальная')}
+            ${incomePill('gray','Серая зона')}
+            ${incomePill('scam','Скам')}
+          </div>
+          ${sliderRow('life','Быт', S.allocation.life)}
+          ${minLifeFor(S)>0 && S.allocation.life<minLifeFor(S) ? `<div class="warn-inline">Высокая эскалация требует минимум ${minLifeFor(S)} юнита на быт.</div>` : ''}
+          ${sliderRow('relations','Отношения', S.allocation.relations)}
+          ${sliderRow('relief','Разгрузка', S.allocation.relief)}
+          <div class="budget-line">
+            <span>Юнитов распределено:</span>
+            <b class="${sum>budget?'over':''}">${sum} / ${budget}</b>
+          </div>
+          ${S.allocation.relations !== relSum ? `<div class="warn-inline">Распредели все юниты «Отношений» между конкретными людьми ниже (${relSum}/${S.allocation.relations}).</div>` : ''}
+          <button class="confirm" ${valid?'':'disabled'} onclick="confirmWeek()">Подтвердить неделю</button>
+        </div>
+
+        <div class="panel">
+          <h2>Отношения <small>распредели юниты категории «Отношения»</small></h2>
+          <div class="npc-grid">
+            ${Object.keys(NPC_LABELS).map(k=>npcCard(k)).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <h2>Прогноз риска</h2>
+          ${forecast ? `
+            <div class="forecast-box">
+              Заработок (${incomeLabel(S.incomeType)}), ${S.allocation.income} юнита вложено →<br>
+              прогноз: <span class="num">${Math.round(forecast.low).toLocaleString('ru-RU')}–${Math.round(forecast.high).toLocaleString('ru-RU')}₽</span><br>
+              риск провала: <span class="risk">~${Math.round(forecast.fail*100)}%</span>
+              ${tier>=2 && S.incomeType==='legal' ? `<div class="tier-note">Легальный рынок просел из-за эскалации — доходность снижена.</div>`:''}
+            </div>
+          ` : `<div class="forecast-box">Юниты в «Заработок» не вложены — дохода не будет.</div>`}
+        </div>
+
+        <div class="panel">
+          <h2>Отчёт недели</h2>
+          <div class="report">${S.log.length? S.log[0].text : 'Семестр только начинается.'}</div>
+        </div>
+      </div>
+    </div>
+
+    <footer>Данил · Далевский университет · общага №3 · неделя ${S.week} из ${MAX_WEEKS}</footer>
+
+    ${S.modal ? modalHtml(S.modal) : ''}
+  `;
+
+  attachSliderHandlers();
+}
+
+function statCard(label, value, pct, invert){
+  return `<div class="stat">
+    <div class="stat-label"><span>${label}</span></div>
+    <div class="stat-value">${value}</div>
+    <div class="bar"><i style="width:${clamp(pct,0,100)}%;background:${barColor(pct,invert)}"></i></div>
+  </div>`;
+}
+
+function sliderRow(key,label,value){
+  const eff = effectiveUnits(value).toFixed(1);
+  return `<div class="slider-row">
+    <div class="slider-head"><b>${label}: ${value}</b><span class="eff">эфф. отдача ≈ ${eff}</span></div>
+    <input type="range" min="0" max="21" value="${value}" data-key="${key}" class="alloc-slider">
+  </div>`;
+}
+function incomePill(type,label){
+  return `<div class="pill ${S.incomeType===type?'active':''}" onclick="setIncomeType('${type}')">${label}</div>`;
+}
+function npcCard(k){
+  const val = S.relationSplit[k]||0;
+  const trust = S.trust[k];
+  const label = k==='kondratyuk' ? NPC_LABELS[k]+' (состояние)' : NPC_LABELS[k];
+  return `<div class="npc">
+    <div class="npc-name">${label} <span>${trust}</span></div>
+    <div class="bar"><i style="width:${trust}%;background:${barColor(trust,false)}"></i></div>
+    <input type="range" min="0" max="21" value="${val}" data-npc="${k}" class="npc-slider">
+    <span class="lock">юнитов: ${val}</span>
+  </div>`;
+}
+function modalHtml(m){
+  return `<div class="modal-backdrop"><div class="modal">
+    <h3>${m.title}</h3>
+    <p>${m.text}</p>
+    <div class="choices">
+      ${m.choices.map((c,i)=>`<button class="secondary" onclick="handleModalChoice(${i})">${c.label}</button>`).join('')}
+    </div>
+  </div></div>`;
+}
+function handleModalChoice(i){ closeModal(S.modal.choices[i]); }
+
+function attachSliderHandlers(){
+  document.querySelectorAll('.alloc-slider').forEach(el=>{
+    el.addEventListener('input', e=> setAlloc(e.target.dataset.key, e.target.value));
+  });
+  document.querySelectorAll('.npc-slider').forEach(el=>{
+    el.addEventListener('input', e=> setRelation(e.target.dataset.npc, e.target.value));
+  });
+}
+
+render();
+</script>
+</body>
+</html>
