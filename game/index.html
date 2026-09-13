@@ -192,6 +192,13 @@
   .shop-item .cat{font-size:.62rem;text-transform:uppercase;letter-spacing:.4px;color:var(--text-dim);}
   .shop-item .eff{color:var(--text-dim);font-size:.72rem;}
   .shop-item.owned{border-color:var(--good);}
+  .diff-picker{margin:14px 0;}
+  .diff-picker-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.4px;color:var(--text-dim);margin-bottom:8px;}
+  .diff-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;}
+  .diff-option{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;}
+  .diff-option.active{border-color:var(--accent);background:rgba(91,157,194,.12);}
+  .diff-name{font-weight:700;font-size:.84rem;}
+  .diff-hint{color:var(--text-dim);font-size:.72rem;margin-top:3px;line-height:1.4;}
 </style>
 </head>
 <body>
@@ -240,6 +247,18 @@ function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function roundMoney(v){ return Math.round(v/500)*500; }
 function fmt(n){ return Math.round(n).toLocaleString('ru-RU'); }
 function priceMult(escalation){ return 1 + 0.15*Math.floor(escalation/25); }
+
+/* ============ СЛОЖНОСТЬ ============ */
+// Пресеты масштабируют уже выверенный баланс "нормального" уровня, а не переписывают формулы —
+// pressureMult давит на пассивный рост хвостов/расхода еды/базового стресса, failMult — на шанс
+// провала схем заработка, criminalMult — на скорость роста уголовного риска, rentMult — на аренду.
+const DIFFICULTY_PRESETS = {
+  easy:   { label:'Спокойная общага',  hint:'Больше стартовых денег, схемы надёжнее, давление слабее.', startMoney:15000, pressureMult:0.82, failMult:0.85, criminalMult:0.75, rentMult:0.85, minLifeTier4:4 },
+  normal: { label:'Как у всех',        hint:'Баланс по умолчанию — ровно на грани.',                     startMoney:4000,  pressureMult:1,    failMult:1,    criminalMult:1,    rentMult:1,    minLifeTier4:5 },
+  hard:   { label:'Без подстраховки',  hint:'Меньше денег на старте, риски выше, мир жёстче.',            startMoney:1500,  pressureMult:1.18, failMult:1.18, criminalMult:1.35, rentMult:1.18, minLifeTier4:6 }
+};
+function diff(){ return DIFFICULTY_PRESETS[S.difficulty] || DIFFICULTY_PRESETS.normal; }
+function addCriminalRisk(amount){ S.resources.criminalRisk = clamp(S.resources.criminalRisk + amount*diff().criminalMult, 0, 100); }
 
 /* ============ ИМЕННЫЕ СХЕМЫ ЗАРАБОТКА ============ */
 // диапазоны заданы "на типичное вложение" (~4 юнита, эфф.≈3.7) и масштабируются юнитами
@@ -320,6 +339,7 @@ function schemeParams(id, units, tier){
     low*=mult; high*=mult;
   }
   if(s.cat!=='legal') fail = clamp(fail + 0.015*(tier-1), 0, 0.9);
+  fail = clamp(fail*diff().failMult, 0, 0.95);
   return { low, high, fail, scale };
 }
 
@@ -361,12 +381,14 @@ const QUIZ_UPP = [
 ];
 
 /* ============ СОСТОЯНИЕ ============ */
-function freshState(){
+function freshState(difficultyLevel){
+  const level = DIFFICULTY_PRESETS[difficultyLevel] ? difficultyLevel : 'normal';
   const s = {
     week: 1,
     turnPhase: 'alloc', // 'alloc' | 'event'
     started: false,
     gameOver: null,
+    difficulty: level,
     directorEra: 'lazor',
     directorName: 'Лазор',
     studentStatus: true,
@@ -381,7 +403,7 @@ function freshState(){
     kryakovtsevFirstExpulsionUsed: false,
     kryakovtsevResignWeek: null,
     mobilizationAnnounced: false,
-    resources: { money: 4000, stress: 25, food: 60, tails: 8, escalation: 0, criminalRisk: 0 },
+    resources: { money: DIFFICULTY_PRESETS[level].startMoney, stress: 25, food: 60, tails: 8, escalation: 0, criminalRisk: 0 },
     trust: { director:50, zemlekop:50, upp:45, vlados:0, arkadiy:0, kondratyuk:82 },
     crisisCounters: { tails:0, food:0, lifeNeglect:0 },
     firedEvents: {},
@@ -402,7 +424,7 @@ let S = freshState();
 
 /* ============ ПРАВИЛА БЮДЖЕТА ============ */
 function budgetFor(){ return BASE_BUDGET; }
-function minLifeFor(){ return escalationTier(S.resources.escalation) >= 4 ? 5 : 0; }
+function minLifeFor(){ return escalationTier(S.resources.escalation) >= 4 ? diff().minLifeTier4 : 0; }
 function allocSum(a){ return a.study+a.income+a.life+a.relations+a.relief; }
 
 /* ============ ХОД РАСПРЕДЕЛЕНИЯ (недельная математика) ============ */
@@ -415,7 +437,7 @@ function resolveAllocTurn(){
   // со временем перестаёт справляться, нужно наращивать вложение.
   const weekFrac = clamp(S.week/MAX_WEEKS, 0, 1);
   const effStudy = effectiveUnits(a.study);
-  let tailsDelta = Math.round((7 + 5*weekFrac) - 3.3*effStudy);
+  let tailsDelta = Math.round((7 + 5*weekFrac)*diff().pressureMult - 3.3*effStudy);
   if(S.shop.konspekt) tailsDelta -= 1;
   const tailsBefore = S.resources.tails;
   S.resources.tails = clamp(S.resources.tails + tailsDelta, 0, 100);
@@ -436,7 +458,7 @@ function resolveAllocTurn(){
       if(s.onSuccess) s.onSuccess(lines.money);
     }
     if(s.criminal){
-      S.resources.criminalRisk = clamp(S.resources.criminalRisk + s.criminal, 0, 100);
+      addCriminalRisk(s.criminal);
       lines.flags.push(`Уголовный риск незаметно подрос (дело с Владосом).`);
     }
   }
@@ -446,12 +468,12 @@ function resolveAllocTurn(){
   // получится купить. Плюс налаженный быт немного помогает и со стрессом (самоуход), не только с едой.
   const effLife = effectiveUnits(a.life);
   const foodTarget = Math.round(effLife*7) + (S.shop.apartment ? 4 : 0);
-  const costPerPoint = Math.round(95 * priceMult(S.resources.escalation));
+  const costPerPoint = Math.round(95 * priceMult(S.resources.escalation) * diff().pressureMult);
   const desiredCost = foodTarget*costPerPoint;
   const affordable = Math.min(desiredCost, S.resources.money);
   const foodGain = desiredCost>0 ? Math.round(foodTarget*(affordable/desiredCost)) : 0;
   S.resources.money = Math.max(0, S.resources.money - affordable);
-  const decay = Math.round(rnd(8,14) + 3*weekFrac);
+  const decay = Math.round((rnd(8,14) + 3*weekFrac) * diff().pressureMult);
   const foodBefore = S.resources.food;
   S.resources.food = clamp(S.resources.food - decay + foodGain, 0, 100);
   lines.food.push(`${foodBefore}→${S.resources.food} (расход −${decay}, закупка +${foodGain} из ${foodTarget} желаемых, за ${fmt(affordable)}₽)`);
@@ -463,7 +485,7 @@ function resolveAllocTurn(){
 
   // Аренда общаги — периодический флейвор-платёж (не узел доверия)
   if(S.week>=S.rentDueWeek){
-    const rent = Math.round(rnd(4000,6000)*priceMult(S.resources.escalation));
+    const rent = Math.round(rnd(4000,6000)*priceMult(S.resources.escalation)*diff().rentMult);
     if(S.resources.money>=rent){
       S.resources.money -= rent;
       lines.money.push(`Оплата общежития: −${fmt(rent)}₽`);
@@ -481,7 +503,7 @@ function resolveAllocTurn(){
   // Разгрузка -> стресс. Базовая усталость растёт по ходу семестра, а разгрузка со временем
   // (и с ростом эскалации) даёт всё меньшую отдачу — одного юнита надолго не хватит.
   const effRelief = effectiveUnits(a.relief);
-  const stressBase = Math.round(6 + 6*weekFrac);
+  const stressBase = Math.round((6 + 6*weekFrac) * diff().pressureMult);
   const reliefMult = 1 - 0.05*(tier-1);
   const reliefEffect = Math.round(effRelief*3.2*reliefMult);
   let stressChange = stressBase - reliefEffect - lifeComfort;
@@ -873,11 +895,11 @@ function randomEventPool(){
         { label:'Не в этот раз', effect:()=>{ S.trust.vlados=clamp(S.trust.vlados-10,0,100); S.resources.stress=clamp(S.resources.stress+10,0,100); } }
       ]};}},
       { id:'vlados_police_hide', build:()=>({ title:'Спрятать «до времени»', kicker:'Владос', text:'Просит подержать пакет у себя в комнате пару дней, ничего не объясняя.', choices:[
-        { label:'Согласиться', effect:()=>{ S.resources.criminalRisk=clamp(S.resources.criminalRisk+15,0,100); S.trust.vlados=clamp(S.trust.vlados+10,0,100); } },
+        { label:'Согласиться', effect:()=>{ addCriminalRisk(15); S.trust.vlados=clamp(S.trust.vlados+10,0,100); } },
         { label:'Отказать наотрез', effect:()=>{ S.trust.vlados=clamp(S.trust.vlados-12,0,100); } }
       ]})},
       { id:'vlados_connect', build:()=>{ const gain=Math.round(rnd(30000,90000)); return { title:'Владос сватает «нужного человека»', kicker:'Владос', text:'Разовая возможность крупного заработка через его связи.', choices:[
-        { label:'Воспользоваться', effect:()=>{ S.resources.money+=gain; S.resources.criminalRisk=clamp(S.resources.criminalRisk+8,0,100); } },
+        { label:'Воспользоваться', effect:()=>{ S.resources.money+=gain; addCriminalRisk(8); } },
         { label:'Мимо', effect:()=>{} }
       ]};}}
     );
@@ -1007,7 +1029,7 @@ function buyItem(id){
   S.shop[id] = { boughtWeek:S.week, paid:price };
   if(item.cat==='premium'){
     const premiumCount = Object.keys(S.shop).filter(k=>SHOP_ITEMS[k] && SHOP_ITEMS[k].cat==='premium').length;
-    if(premiumCount>1) S.resources.criminalRisk = clamp(S.resources.criminalRisk+3,0,100);
+    if(premiumCount>1) addCriminalRisk(3);
   }
   if(item.stress){
     const dec = decayFactor();
@@ -1027,8 +1049,10 @@ function sellItem(id){
   saveIfOngoing();
   render();
 }
+let selectedDifficulty = 'normal';
+function setDifficulty(level){ if(DIFFICULTY_PRESETS[level]) selectedDifficulty = level; render(); }
 function restartGame(){ clearSave(); S = freshState(); render(); }
-function startGame(){ clearSave(); S = freshState(); S.started = true; saveGame(); render(); startMusic(); }
+function startGame(){ clearSave(); S = freshState(selectedDifficulty); S.started = true; saveGame(); render(); startMusic(); }
 function continueGame(){
   const saved = loadGame();
   if(saved){ S = saved; S.started = true; render(); }
@@ -1078,8 +1102,19 @@ function render(){
         сами по себе без постоянной подпитки. Схемы заработка на рынке меняются по ходу игры и сильно отличаются
         доходностью и риском. Дорогие покупки доступны в любой момент через отдельную витрину.
         </p>
+        <div class="diff-picker">
+          <div class="diff-picker-label">Сложность нового семестра</div>
+          <div class="diff-options">
+            ${Object.keys(DIFFICULTY_PRESETS).map(level=>`
+              <div class="diff-option ${selectedDifficulty===level?'active':''}" onclick="setDifficulty('${level}')">
+                <div class="diff-name">${DIFFICULTY_PRESETS[level].label}</div>
+                <div class="diff-hint">${DIFFICULTY_PRESETS[level].hint}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
         ${saved ? `
-          <button class="confirm" onclick="continueGame()">Продолжить (неделя ${saved.week})</button>
+          <button class="confirm" onclick="continueGame()">Продолжить (неделя ${saved.week}, сложность: ${DIFFICULTY_PRESETS[saved.difficulty||'normal'].label})</button>
           <button class="secondary" style="margin-top:8px;width:100%" onclick="startGame()">Начать заново</button>
         ` : `
           <button class="confirm" onclick="startGame()">Начать семестр</button>
@@ -1135,7 +1170,7 @@ function render(){
 
   app.innerHTML = `
     <h1>Деканат — менеджмент-версия</h1>
-    <p class="subtitle">${turnLabel} · ${weekLabel} · Ход распределения · Директор института: ${S.directorName} · <span class="status-badge ${S.studentStatus?'ok':'bad'}">${S.studentStatus?'Студент':'Отчислен'}</span></p>
+    <p class="subtitle">${turnLabel} · ${weekLabel} · Ход распределения · Директор института: ${S.directorName} · Сложность: ${diff().label} · <span class="status-badge ${S.studentStatus?'ok':'bad'}">${S.studentStatus?'Студент':'Отчислен'}</span></p>
 
     <div class="topbar">
       ${statCard('Деньги', fmt(r.money)+'₽', Math.min(100,r.money/100000), false)}
