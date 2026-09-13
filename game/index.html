@@ -98,7 +98,9 @@
   }
   .budget-line b{font-family:var(--mono);}
   .budget-line b.over{color:var(--bad);}
-  .sub-options{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;}
+  .sub-options{display:flex;gap:6px;margin:2px 0 8px;flex-wrap:wrap;}
+  .scheme-group{margin-bottom:2px;}
+  .scheme-group-label{display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.4px;color:var(--text-dim);margin:6px 0 2px;}
   .pill{
     border:1px solid var(--border);background:var(--panel-2);color:var(--text-dim);
     padding:4px 10px;border-radius:3px;font-size:.72rem;cursor:pointer;user-select:none;
@@ -1002,7 +1004,6 @@ function render(){
   const remaining = budget - sum;
   const valid = validAllocation();
   const relSum = Object.values(S.relationSplit).reduce((a,b)=>a+b,0);
-  const avail = availableSchemeIds();
   const forecast = (S.allocation.income>0 && S.incomeScheme) ? schemeParams(S.incomeScheme, S.allocation.income, tier) : null;
 
   app.innerHTML = `
@@ -1030,9 +1031,7 @@ function render(){
           <h2>Распределение юнитов <small>осталось: ${remaining}/${budget}</small></h2>
           ${sliderRow('study','Учёба', S.allocation.study)}
           ${sliderRow('income','Заработок', S.allocation.income)}
-          <div class="sub-options">
-            ${avail.map(id=>schemePill(id)).join('') || '<span style="color:var(--text-dim);font-size:.75rem">На рынке сейчас пусто — ждём ротации.</span>'}
-          </div>
+          ${schemeGroups()}
           ${sliderRow('life','Быт', S.allocation.life)}
           ${minLifeFor()>0 && S.allocation.life<minLifeFor() ? `<div class="warn-inline">Высокая эскалация требует минимум ${minLifeFor()} юнита на быт.</div>` : ''}
           ${sliderRow('relations','Отношения', S.allocation.relations)}
@@ -1120,6 +1119,16 @@ function sliderRow(key,label,value){
 function schemePill(id){
   const s = SCHEMES[id];
   return `<div class="pill tag-${s.cat} ${S.incomeScheme===id?'active':''}" onclick="setScheme('${id}')">${s.label}</div>`;
+}
+const CAT_LABELS = { legal:'Легальная', gray:'Серая зона', scam:'Скам', criminal:'Криминал (Владос)' };
+function schemeGroups(){
+  const groups = { legal:S.market.legal, gray:S.market.gray, scam:S.market.scam };
+  if(S.vladosUnlocked) groups.criminal = ['vlados_deal'];
+  return Object.keys(groups).map(cat=>{
+    const ids = groups[cat];
+    if(!ids.length) return '';
+    return `<div class="scheme-group"><span class="scheme-group-label">${CAT_LABELS[cat]}</span><div class="sub-options">${ids.map(id=>schemePill(id)).join('')}</div></div>`;
+  }).join('') || '<span style="color:var(--text-dim);font-size:.75rem">На рынке сейчас пусто — ждём ротации.</span>';
 }
 function npcCard(k){
   const val = S.relationSplit[k]||0;
