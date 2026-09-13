@@ -923,7 +923,7 @@ function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
 function saveIfOngoing(){ if(!S.gameOver) saveGame(); }
 
 /* ============ ДЕЙСТВИЯ UI ============ */
-function setAlloc(key, val){
+function setAlloc(key, val, live){
   S.allocation[key] = clamp(parseInt(val)||0, 0, 21);
   if(key==='relations'){
     const cap = S.allocation.relations;
@@ -937,14 +937,14 @@ function setAlloc(key, val){
       }
     }
   }
-  render();
+  if(live) patchLiveUI(); else render();
 }
-function setRelation(npc, val){
+function setRelation(npc, val, live){
   const v = clamp(parseInt(val)||0,0,21);
   const others = Object.keys(S.relationSplit).filter(k=>k!==npc).reduce((a,k)=>a+S.relationSplit[k],0);
   const cap = S.allocation.relations;
   S.relationSplit[npc] = Math.min(v, Math.max(0, cap-others));
-  render();
+  if(live) patchLiveUI(); else render();
 }
 function setScheme(id){ S.incomeScheme = id; render(); }
 function validAllocation(){
@@ -1132,7 +1132,6 @@ function render(){
   const remaining = budget - sum;
   const valid = validAllocation();
   const relSum = Object.values(S.relationSplit).reduce((a,b)=>a+b,0);
-  const forecast = (S.allocation.income>0 && S.incomeScheme) ? schemeParams(S.incomeScheme, S.allocation.income, tier) : null;
 
   app.innerHTML = `
     <h1>Деканат — менеджмент-версия</h1>
@@ -1156,20 +1155,20 @@ function render(){
     <div class="grid">
       <div>
         <div class="panel">
-          <h2>Распределение юнитов <small>осталось: ${remaining}/${budget}</small></h2>
+          <h2>Распределение юнитов <small id="budget-remaining">осталось: ${remaining}/${budget}</small></h2>
           ${sliderRow('study','Учёба', S.allocation.study)}
           ${sliderRow('income','Заработок', S.allocation.income)}
           ${schemeGroups()}
           ${sliderRow('life','Быт', S.allocation.life)}
-          ${minLifeFor()>0 && S.allocation.life<minLifeFor() ? `<div class="warn-inline">Высокая эскалация требует минимум ${minLifeFor()} юнита на быт.</div>` : ''}
+          <div class="warn-inline" id="minlife-warning" ${(minLifeFor()>0 && S.allocation.life<minLifeFor())?'':'hidden'}>Высокая эскалация требует минимум ${minLifeFor()} юнита на быт.</div>
           ${sliderRow('relations','Отношения', S.allocation.relations)}
           ${sliderRow('relief','Разгрузка', S.allocation.relief)}
           <div class="budget-line">
             <span>Юнитов распределено:</span>
-            <b class="${sum>budget?'over':''}">${sum} / ${budget}</b>
+            <b id="budget-total" class="${sum>budget?'over':''}">${sum} / ${budget}</b>
           </div>
-          ${S.allocation.relations !== relSum ? `<div class="warn-inline">Распредели все юниты «Отношений» между конкретными людьми ниже (${relSum}/${S.allocation.relations}).</div>` : ''}
-          <button class="confirm" ${valid?'':'disabled'} onclick="confirmAllocTurn()">Подтвердить ход распределения</button>
+          <div class="warn-inline" id="relations-warning" ${S.allocation.relations===relSum?'hidden':''}>Распредели все юниты «Отношений» между конкретными людьми ниже (${relSum}/${S.allocation.relations}).</div>
+          <button class="confirm" id="confirm-btn" ${valid?'':'disabled'} onclick="confirmAllocTurn()">Подтвердить ход распределения</button>
         </div>
 
         <div class="panel">
@@ -1190,15 +1189,7 @@ function render(){
       <div>
         <div class="panel">
           <h2>Прогноз риска</h2>
-          ${forecast ? `
-            <div class="forecast-box">
-              ${SCHEMES[S.incomeScheme].label}, ${S.allocation.income} юнита вложено →<br>
-              прогноз: <span class="num">${fmt(forecast.low)}–${fmt(forecast.high)}₽</span><br>
-              риск провала: <span class="risk">~${Math.round(forecast.fail*100)}%</span>
-              ${SCHEMES[S.incomeScheme].cat==='legal' && tier>=2 ? `<div class="tier-note">Легальный рынок просел из-за эскалации.</div>`:''}
-              ${SCHEMES[S.incomeScheme].criminal ? `<div class="tier-note">Участие повышает уголовный риск независимо от исхода.</div>`:''}
-            </div>
-          ` : `<div class="forecast-box">Юниты в «Заработок» не вложены или схема не выбрана — дохода не будет.</div>`}
+          <div class="forecast-box" id="forecast-box">${forecastInnerHtml()}</div>
         </div>
 
         <div class="panel">
@@ -1230,6 +1221,64 @@ function renderReport(){
   ].filter(Boolean).join('\n');
 }
 
+function forecastInnerHtml(){
+  const tier = escalationTier(S.resources.escalation);
+  const forecast = (S.allocation.income>0 && S.incomeScheme && SCHEMES[S.incomeScheme]) ? schemeParams(S.incomeScheme, S.allocation.income, tier) : null;
+  if(!forecast) return 'Юниты в «Заработок» не вложены или схема не выбрана — дохода не будет.';
+  const s = SCHEMES[S.incomeScheme];
+  return `${s.label}, ${S.allocation.income} юнита вложено →<br>
+    прогноз: <span class="num">${fmt(forecast.low)}–${fmt(forecast.high)}₽</span><br>
+    риск провала: <span class="risk">~${Math.round(forecast.fail*100)}%</span>
+    ${s.cat==='legal' && tier>=2 ? `<div class="tier-note">Легальный рынок просел из-за эскалации.</div>`:''}
+    ${s.criminal ? `<div class="tier-note">Участие повышает уголовный риск независимо от исхода.</div>`:''}`;
+}
+
+// Во время перетаскивания ползунка (событие 'input') НЕ пересоздаём DOM — полный render()
+// уничтожил бы сам элемент <input type=range> под курсором, и браузер терял бы захват
+// перетаскивания (отсюда ощущение "работают только клики"). Точечно патчим только цифры,
+// а полноценный render() вызывается по 'change' (когда палец/курсор уже отпущен).
+function patchLiveUI(){
+  if(!S.started || S.gameOver || S.turnPhase!=='alloc') return;
+  Object.keys(ALLOC_LABELS).forEach(key=>{
+    const labelEl = document.getElementById('val-'+key);
+    const effEl = document.getElementById('eff-'+key);
+    if(labelEl) labelEl.textContent = `${ALLOC_LABELS[key]}: ${S.allocation[key]}`;
+    if(effEl) effEl.textContent = `эфф. отдача ≈ ${effectiveUnits(S.allocation[key]).toFixed(1)}`;
+  });
+
+  const sum = allocSum(S.allocation);
+  const budget = budgetFor();
+  const relSum = Object.values(S.relationSplit).reduce((a,b)=>a+b,0);
+
+  const remainingEl = document.getElementById('budget-remaining');
+  if(remainingEl) remainingEl.textContent = `осталось: ${budget-sum}/${budget}`;
+  const totalEl = document.getElementById('budget-total');
+  if(totalEl){ totalEl.textContent = `${sum} / ${budget}`; totalEl.classList.toggle('over', sum>budget); }
+
+  const minLifeWarn = document.getElementById('minlife-warning');
+  if(minLifeWarn) minLifeWarn.hidden = !(minLifeFor()>0 && S.allocation.life<minLifeFor());
+
+  const relWarn = document.getElementById('relations-warning');
+  if(relWarn){
+    const mismatch = S.allocation.relations !== relSum;
+    relWarn.hidden = !mismatch;
+    if(mismatch) relWarn.textContent = `Распредели все юниты «Отношений» между конкретными людьми ниже (${relSum}/${S.allocation.relations}).`;
+  }
+
+  const confirmBtn = document.getElementById('confirm-btn');
+  if(confirmBtn) confirmBtn.disabled = !validAllocation();
+
+  const forecastBox = document.getElementById('forecast-box');
+  if(forecastBox) forecastBox.innerHTML = forecastInnerHtml();
+
+  Object.keys(S.relationSplit).forEach(k=>{
+    const rangeEl = document.querySelector(`.npc-slider[data-npc="${k}"]`);
+    if(rangeEl && Number(rangeEl.value)!==S.relationSplit[k]) rangeEl.value = S.relationSplit[k]||0;
+    const unitsEl = document.getElementById('npc-units-'+k);
+    if(unitsEl) unitsEl.textContent = `юнитов: ${S.relationSplit[k]||0} · ${NPC_SUBLABEL[k]}`;
+  });
+}
+
 function statCard(label, value, pct, invert){
   return `<div class="stat">
     <div class="stat-label"><span>${label}</span></div>
@@ -1237,10 +1286,11 @@ function statCard(label, value, pct, invert){
     <div class="bar"><i style="width:${clamp(pct,0,100)}%;background:${barColor(pct,invert)}"></i></div>
   </div>`;
 }
+const ALLOC_LABELS = { study:'Учёба', income:'Заработок', life:'Быт', relations:'Отношения', relief:'Разгрузка' };
 function sliderRow(key,label,value){
   const eff = effectiveUnits(value).toFixed(1);
   return `<div class="slider-row">
-    <div class="slider-head"><b>${label}: ${value}</b><span class="eff">эфф. отдача ≈ ${eff}</span></div>
+    <div class="slider-head"><b id="val-${key}">${label}: ${value}</b><span class="eff" id="eff-${key}">эфф. отдача ≈ ${eff}</span></div>
     <input type="range" min="0" max="21" value="${value}" data-key="${key}" class="alloc-slider">
   </div>`;
 }
@@ -1266,7 +1316,7 @@ function npcCard(k){
     <div class="npc-name">${NPC_LABELS[k]} <span>${trust}</span></div>
     <div class="bar"><i style="width:${trust}%;background:${barColor(trust,false)}"></i></div>
     <input type="range" min="0" max="21" value="${val}" data-npc="${k}" class="npc-slider">
-    <span class="lock">юнитов: ${val} · ${NPC_SUBLABEL[k]}</span>
+    <span class="lock" id="npc-units-${k}">юнитов: ${val} · ${NPC_SUBLABEL[k]}</span>
   </div>`;
 }
 function shopItemCard(id){
@@ -1295,10 +1345,12 @@ function modalHtml(m, isEventTurn){
 }
 function attachSliderHandlers(){
   document.querySelectorAll('.alloc-slider').forEach(el=>{
-    el.addEventListener('input', e=> setAlloc(e.target.dataset.key, e.target.value));
+    el.addEventListener('input', e=> setAlloc(e.target.dataset.key, e.target.value, true));
+    el.addEventListener('change', e=> setAlloc(e.target.dataset.key, e.target.value, false));
   });
   document.querySelectorAll('.npc-slider').forEach(el=>{
-    el.addEventListener('input', e=> setRelation(e.target.dataset.npc, e.target.value));
+    el.addEventListener('input', e=> setRelation(e.target.dataset.npc, e.target.value, true));
+    el.addEventListener('change', e=> setRelation(e.target.dataset.npc, e.target.value, false));
   });
 }
 
