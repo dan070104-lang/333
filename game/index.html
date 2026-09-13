@@ -1146,9 +1146,24 @@ let selectedDifficulty = 'normal';
 function setDifficulty(level){ if(DIFFICULTY_PRESETS[level]) selectedDifficulty = level; render(); }
 function restartGame(){ clearSave(); S = freshState(); render(); }
 function startGame(){ clearSave(); S = freshState(selectedDifficulty); S.started = true; saveGame(); render(); startMusic(); }
+// Патчит сохранение, сделанное до появления поля "Навыки": в старом сейве
+// resources.skill/allocation.skill отсутствуют (undefined), а undefined в
+// арифметике даёт NaN, который затем расползается в деньги и еду через
+// skillBonus()/affordable — чинит корень (skill) и восстанавливает уже
+// испорченные деньги/еду, если они успели стать NaN до этого патча.
+function migrateSave(s){
+  if(!s.resources) s.resources = {};
+  const r = s.resources;
+  if(typeof r.skill !== 'number' || isNaN(r.skill)) r.skill = 15;
+  if(typeof r.money !== 'number' || isNaN(r.money)) r.money = (DIFFICULTY_PRESETS[s.difficulty] || DIFFICULTY_PRESETS.normal).startMoney;
+  if(typeof r.food !== 'number' || isNaN(r.food)) r.food = 60;
+  if(!s.allocation) s.allocation = {};
+  if(typeof s.allocation.skill !== 'number' || isNaN(s.allocation.skill)) s.allocation.skill = 0;
+  return s;
+}
 function continueGame(){
   const saved = loadGame();
-  if(saved){ S = saved; S.started = true; render(); }
+  if(saved){ S = migrateSave(saved); S.started = true; render(); }
   else startGame();
   startMusic();
 }
