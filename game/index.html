@@ -244,31 +244,31 @@ function priceMult(escalation){ return 1 + 0.15*Math.floor(escalation/25); }
 /* ============ ИМЕННЫЕ СХЕМЫ ЗАРАБОТКА ============ */
 // диапазоны заданы "на типичное вложение" (~4 юнита, эфф.≈3.7) и масштабируются юнитами
 const TYPICAL_EFF = 3.7;
+// Все схемы — интернет-заработок: фриланс-биржи, удалённая работа, telegram-каналы, крипта, онлайн-ставки.
 const SCHEMES = {
-  doc_translation:{ label:'Перевод документов (Сергей_ИП84)', cat:'legal', low:3000, high:10000, fail:0.08,
-    onFail:(lines)=>{ lines.push('Перевод документов: заказчик передумал — ушёл вечер, денег нет.'); } },
-  tutoring:{ label:'Репетиторство', cat:'legal', low:4000, high:12000, fail:0.10,
-    onFail:(lines)=>{ lines.push('Репетиторство: ученик заболел, занятие сорвалось.'); } },
-  copywriting:{ label:'Копирайтинг для юрфирмы', cat:'legal', low:5000, high:15000, fail:0.12,
+  doc_translation:{ label:'Перевод документов на бирже фриланса (Сергей_ИП84)', cat:'legal', low:3000, high:10000, fail:0.08,
+    onFail:(lines)=>{ lines.push('Перевод документов: заказчик пропал с биржи — ушёл вечер, денег нет.'); } },
+  tutoring:{ label:'Репетиторство по видеосвязи', cat:'legal', low:4000, high:12000, fail:0.10,
+    onFail:(lines)=>{ lines.push('Репетиторство по видеосвязи: ученик отменил занятие, оплата не проходит.'); } },
+  copywriting:{ label:'Удалённый копирайтинг для юрфирмы', cat:'legal', low:5000, high:15000, fail:0.12,
     onFail:(lines)=>{ lines.push('Копирайтинг: текст завернули на правки, в срок не уложились — оплаты нет.'); },
     onSuccess:(lines)=>{ if(Math.random()<0.3){ S.trust.director=clamp(S.trust.director+3,0,100); lines.push('Фирма — партнёр института: хорошая работа долетела до администрации, доверие директора +3.'); } } },
-  courier:{ label:'Подработка курьером', cat:'legal', low:2000, high:6000, fail:0.05,
-    onFail:(lines)=>{ lines.push('Курьером: заказ отменили на середине маршрута.'); },
-    onSuccess:(lines)=>{ S.resources.stress=clamp(S.resources.stress+2,0,100); lines.push('Курьером: набегался — стресс +2 сверху, но деньги живые.'); } },
-  fake_certs:{ label:'Липовые справки об успеваемости', cat:'gray', low:15000, high:50000, fail:0.30,
+  transcription:{ label:'Транскрибация лекций на бирже фриланса', cat:'legal', low:2000, high:6000, fail:0.05,
+    onFail:(lines)=>{ lines.push('Транскрибация: заказчик отменил задание на середине файла.'); } },
+  fake_certs:{ label:'Справки об успеваемости через Telegram-бота', cat:'gray', low:15000, high:50000, fail:0.30,
     onFail:(lines)=>{ S.trust.director=clamp(S.trust.director-12,0,100); S.resources.tails=clamp(S.resources.tails+10,0,100);
       lines.push('Справки: подделку заметили — доверие директора −12, хвосты +10.'); } },
-  dropshipping:{ label:'Дропшиппинг', cat:'gray', low:10000, high:40000, fail:0.35,
+  dropshipping:{ label:'Дропшиппинг-магазин на маркетплейсе', cat:'gray', low:10000, high:40000, fail:0.35,
     onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(10000*scale*0.4)); S.resources.money=Math.max(0,S.resources.money-lost);
       lines.push(`Дропшиппинг: поставщик пропал вместе с предоплатой — минус ${fmt(lost)}₽.`); } },
-  leaked_tests:{ label:'Слив тестов УПП/земельного права', cat:'gray', low:8000, high:30000, fail:0.28,
+  leaked_tests:{ label:'Слив тестов в платный Telegram-канал', cat:'gray', low:8000, high:30000, fail:0.28,
     onFail:(lines)=>{ const who = Math.random()<0.5 ? 'zemlekop':'upp'; const label = who==='zemlekop'?'Землекопа':'комиссии УПП';
       S.trust[who]=clamp(S.trust[who]-10,0,100); S.resources.tails=clamp(S.resources.tails+6,0,100);
-      lines.push(`Слив тестов: спалились перед ${label} — доверие −10, хвосты +6.`); } },
-  crypto:{ label:'Крипто-биржа от знакомого', cat:'gray', low:20000, high:100000, fail:0.45,
+      lines.push(`Слив тестов: канал спалили перед ${label} — доверие −10, хвосты +6.`); } },
+  crypto:{ label:'Крипто-трейдинг по сигналам знакомого', cat:'gray', low:20000, high:100000, fail:0.45,
     onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(20000*scale*0.5)); S.resources.money=Math.max(0,S.resources.money-lost);
-      lines.push(`Крипто-биржа: график ушёл не в ту сторону — минус ${fmt(lost)}₽ вложенного.`); } },
-  investclub:{ label:'Инвестклуб', cat:'scam', low:50000, high:400000, fail:0.80,
+      lines.push(`Крипто-трейдинг: график ушёл не в ту сторону — минус ${fmt(lost)}₽ вложенного.`); } },
+  investclub:{ label:'Онлайн-инвестклуб в Telegram', cat:'scam', low:50000, high:400000, fail:0.80,
     onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(50000*scale*0.6)); S.resources.money=Math.max(0,S.resources.money-lost);
       S.resources.stress=clamp(S.resources.stress+18,0,100);
       lines.push(`Инвестклуб: пирамида схлопнулась — минус ${fmt(lost)}₽, стресс +18.`); } },
@@ -276,17 +276,17 @@ const SCHEMES = {
     onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(45000*scale*0.6)); S.resources.money=Math.max(0,S.resources.money-lost);
       S.resources.stress=clamp(S.resources.stress+16,0,100);
       lines.push(`NFT: «памп» оказался сливом ликвидности — минус ${fmt(lost)}₽, стресс +16.`); } },
-  vlados_match:{ label:'Договорной матч (связи Владоса)', cat:'scam', low:60000, high:250000, fail:0.45,
+  vlados_match:{ label:'Ставки через букмекерское приложение (инсайд Владоса)', cat:'scam', low:60000, high:250000, fail:0.45,
     onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(30000*scale*0.4)); S.resources.money=Math.max(0,S.resources.money-lost);
       S.resources.stress=clamp(S.resources.stress+10,0,100);
-      lines.push(`Договорной матч: не срослось — минус ${fmt(lost)}₽, стресс +10.`); },
+      lines.push(`Ставки по инсайду: не срослось — минус ${fmt(lost)}₽, стресс +10.`); },
     criminal:12 },
-  vlados_deal:{ label:'Дело с Владосом', cat:'criminal', low:50000, high:250000, fail:0.30,
-    onFail:(lines)=>{ S.resources.stress=clamp(S.resources.stress+10,0,100); lines.push('Дело с Владосом: сорвалось в последний момент — стресс +10, ничего не заработано.'); },
-    onSuccess:(lines)=>{ S.trust.vlados=clamp(S.trust.vlados+6,0,100); lines.push('Дело с Владосом: сделано чисто, он это ценит — доверие Владоса +6.'); },
+  vlados_deal:{ label:'Дроп-схема через Владоса (обнал через карты)', cat:'criminal', low:50000, high:250000, fail:0.30,
+    onFail:(lines)=>{ S.resources.stress=clamp(S.resources.stress+10,0,100); lines.push('Дроп-схема: карту заблокировали в последний момент — стресс +10, ничего не заработано.'); },
+    onSuccess:(lines)=>{ S.trust.vlados=clamp(S.trust.vlados+6,0,100); lines.push('Дроп-схема: прогнали чисто, Владос это ценит — доверие Владоса +6.'); },
     criminal:15 }
 };
-const LEGAL_IDS = ['doc_translation','tutoring','copywriting','courier'];
+const LEGAL_IDS = ['doc_translation','tutoring','copywriting','transcription'];
 const GRAY_IDS = ['fake_certs','dropshipping','leaked_tests','crypto'];
 const SCAM_IDS = ['investclub','nft_pump','vlados_match'];
 
@@ -376,11 +376,17 @@ function freshState(){
     criminalWarned: false,
     criminalFrozenUntil: 0,
     kryakovtsevPromise: null, // { resolveWeek }
+    bplaContractsAvailable: false,
+    bplaQuotaPressure: false,
+    kryakovtsevFirstExpulsionUsed: false,
+    kryakovtsevResignWeek: null,
+    mobilizationAnnounced: false,
     resources: { money: 4000, stress: 25, food: 60, tails: 8, escalation: 0, criminalRisk: 0 },
     trust: { director:50, zemlekop:50, upp:45, vlados:0, arkadiy:0, kondratyuk:82 },
     crisisCounters: { tails:0, food:0, lifeNeglect:0 },
     firedEvents: {},
     modal: null,
+    chainedModal: null,
     pendingEventTurn: null,
     allocation: { study:4, income:4, life:4, relations:0, relief:0 },
     incomeScheme: 'doc_translation',
@@ -527,6 +533,11 @@ function resolveAllocTurn(){
     S.log.unshift({ week:S.week, phase:'alloc', lines });
     return;
   }
+  if(S.mobilizationAnnounced && S.studentStatus && S.resources.money>=10000000){
+    endGame('win','Таиланд','Деньги на счету, диплом на руках. Наконец можно позволить себе ту самую поездку, о которой шутили весь институт.');
+    S.log.unshift({ week:S.week, phase:'alloc', lines });
+    return;
+  }
 
   S.log.unshift({ week:S.week, phase:'alloc', lines });
   if(S.log.length>40) S.log.pop();
@@ -569,6 +580,13 @@ function buildEventTurn(){
     return { title:'Кряковцев сдержал слово', kicker:'Директор института', text:'Как и обещал, Кряковцев тихо закрыл часть хвостов через деканат — не быстро, но по-человечески.', choices:[{label:'Хорошо, что так', effect:()=>{}}] };
   }
 
+  if(S.kryakovtsevResignWeek && w>=S.kryakovtsevResignWeek && S.directorEra==='kryakovtsev'){
+    S.kryakovtsevResignWeek = null;
+    S.directorEra='vasilina'; S.directorName='Василина';
+    S.trust.director = Math.round(S.trust.director*0.4 + 50*0.6);
+    return { title:'Отставка Кряковцева', kicker:'По собственному желанию', text:'Кряковцев подаёт заявление по собственному желанию — тихо, без скандала. Через пару дней в кабинете уже сидит Василина, политический назначенец, и присматривается ко всем заново.', choices:[{label:'Понятно', effect:()=>{}}] };
+  }
+
   if(w>=20 && S.resources.criminalRisk>0 && !(S.criminalFrozenUntil>=w)){
     const chance = S.resources.criminalRisk/400;
     if(Math.random()<chance) return buildPoliceEvent();
@@ -595,15 +613,46 @@ function buildEventTurn(){
   return built;
 }
 
+// Отчисление возможно только через комиссию (плюс единственное фиксированное первое отчисление).
+// Централизуем разрешение отчисления: мобилизация — мгновенный конец, БПЛА-контракты — шанс на альтернативу.
+function handleExpulsion(){
+  if(S.mobilizationAnnounced){
+    endGame('over','Мобилизация','Отчисление настигло уже после объявления мобилизации — бронь мгновенно теряет силу. За Данилом приезжают в тот же день.');
+    return;
+  }
+  const firstUnderKryakovtsev = S.directorEra==='kryakovtsev' && !S.kryakovtsevFirstExpulsionUsed;
+  const offerBpla = S.bplaContractsAvailable && (firstUnderKryakovtsev || S.bplaQuotaPressure);
+  if(firstUnderKryakovtsev){
+    S.kryakovtsevFirstExpulsionUsed = true;
+    if(!S.kryakovtsevResignWeek) S.kryakovtsevResignWeek = S.week + 4;
+  }
+  if(offerBpla){
+    S.chainedModal = buildBplaOfferModal(firstUnderKryakovtsev);
+  } else {
+    S.studentStatus = false;
+  }
+}
+function buildBplaOfferModal(fromKryakovtsev){
+  const text = fromKryakovtsev
+    ? 'Комиссия проваливается — но вместо отчисления Кряковцев, стараясь не портить институтскую статистику, лично предлагает Данилу контракт: военная служба по контракту в подразделениях операторов БПЛА. Взамен — никакого отчисления.'
+    : 'Комиссия проваливается — но администрации сейчас важнее закрыть план по контрактам. Вместо отчисления Данилу предлагают подписать контракт оператора БПЛА.';
+  return { title:'Контракт оператора БПЛА', kicker:'Вместо отчисления', text, choices:[
+    { label:'Подписать контракт', effect:()=>{
+        endGame('over','Фронт: оператор БПЛА','Данил подписывает контракт. Через несколько недель он уже на фронте — оператором БПЛА. Институт, деканат и хвосты больше не имеют значения.');
+      } },
+    { label:'Отказаться', effect:()=>{ S.studentStatus=false; } }
+  ]};
+}
+
 function buildCommissionEvent(){
   if(S.directorEra==='lazor'){
     const cost = Math.round(rnd(15000,35000) * (0.5 + S.resources.tails/100));
     return { title:'Вызов на комиссию', kicker:'Эпоха Лазор — вопрос решают деньги', text:`Хвосты накопились. При Лазор всё решается напрямую: занести ${fmt(cost)}₽ секретарю — и вопрос снят без комиссии.`, choices:[
       { label:`Занести ${fmt(cost)}₽`, effect:()=>{
           if(S.resources.money>=cost){ S.resources.money-=cost; S.resources.tails=clamp(S.resources.tails-25,0,100); }
-          else { S.studentStatus=false; }
+          else { handleExpulsion(); }
         } },
-      { label:'Отказаться / нечем платить', effect:()=>{ S.studentStatus=false; } }
+      { label:'Отказаться / нечем платить', effect:()=>{ handleExpulsion(); } }
     ]};
   }
   const subject = Math.random()<0.5 ? 'zemlekop' : 'upp';
@@ -617,7 +666,7 @@ function buildCommissionEvent(){
       const isCorrect = i===question.correct;
       const trusted = S.trust[subject]>=30;
       if(isCorrect && trusted){ S.resources.tails=clamp(S.resources.tails-25,0,100); }
-      else { S.studentStatus = false; }
+      else { handleExpulsion(); }
     }
   }));
   if(S.directorEra==='kryakovtsev' && S.trust.director>=50){
@@ -625,7 +674,7 @@ function buildCommissionEvent(){
       if(S.resources.money>=20000){
         S.resources.money-=20000; S.resources.tails=clamp(S.resources.tails-15,0,100);
         S.kryakovtsevPromise = { resolveWeek: Math.min(MAX_WEEKS, S.week+3) };
-      } else { S.studentStatus=false; }
+      } else { handleExpulsion(); }
     }});
   }
   return { title:'Вызов на комиссию', kicker:label, text:`Хвосты накопились настолько, что вызывают на комиссию. Формально верный ответ засчитают только при достаточном доверии — иначе сочтут угаданным.\n\nВопрос: ${question.q}`, choices };
@@ -668,7 +717,7 @@ const FIXED_EVENTS = {
   9: ()=>{
     S.resources.escalation = clamp(S.resources.escalation+10,0,100);
     S.studentStatus = false;
-    return { title:'Первое отчисление', kicker:'Фиксированный сюжетный удар', text:'Приказ подписан безо всякой комиссии — формальность, накопившаяся с самого начала. Восстановление теперь — отдельная статья расходов.', choices:[{label:'...', effect:()=>{}}] };
+    return { title:'Первое отчисление', kicker:'Фиксированный сюжетный удар', text:'Данил приходит в деканат после учебной практики — а там просто сообщают: отчислен за непосещаемость. Никакой комиссии, никаких разговоров — приказ уже подписан. Восстановление теперь отдельная статья расходов.', choices:[{label:'...', effect:()=>{}}] };
   },
   13: ()=>{
     S.resources.escalation = clamp(S.resources.escalation+10,0,100);
@@ -690,15 +739,32 @@ const FIXED_EVENTS = {
     S.vladosUnlocked = true;
     return { title:'Владос', kicker:'Сосед по этажу', text:'Владос окончательно перестаёт быть просто соседом за стеной — криминальный бит, движухи, и предложения, от которых сложно отказаться.', choices:[{label:'Познакомиться поближе', effect:()=>{}}] };
   },
-  30: ()=>{
-    S.resources.escalation = clamp(S.resources.escalation+10,0,100);
-    return { title:'Отставка Кряковцева', kicker:'Под давлением сверху', text:'Кряковцев уходит — не как злодей, а как человек, не готовый быть инструментом того, во что превращается его роль.', choices:[{label:'...', effect:()=>{}}] };
-  },
-  31: ()=>{
+  26: ()=>{
     S.resources.escalation = clamp(S.resources.escalation+8,0,100);
-    S.directorEra='vasilina'; S.directorName='Василина';
-    S.trust.director = Math.round(S.trust.director*0.4 + 50*0.6);
-    return { title:'Назначение Василины', kicker:'Политический назначенец', text:'Депутат Василина занимает кабинет директора института. Дружить с ней мало — либо терпеть, либо отвечать её же оружием.', choices:[{label:'Понятно', effect:()=>{}}] };
+    S.bplaContractsAvailable = true;
+    return { title:'В институте начинают предлагать контракты БПЛА', kicker:'Новая программа', text:'На стендах и в общих чатах появляются объявления: контракт оператора БПЛА — «стабильная служба вместо отчисления». Теперь это не абстракция, а реальная альтернатива, которую при случае предложат и Данилу.', choices:[{label:'Принять к сведению', effect:()=>{}}] };
+  },
+  36: ()=>{
+    S.resources.escalation = clamp(S.resources.escalation+10,0,100);
+    S.bplaQuotaPressure = true;
+    return { title:'Институту спускают квоту', kicker:'Контракты БПЛА', text:'Сверху требуют, чтобы институт обеспечил определённое число подписанных контрактов БПЛА среди студентов. Теперь предложение подписать контракт вместо отчисления будут делать не по-человечески, а по разнарядке — и куда охотнее, чем раньше.', choices:[{label:'Понятно', effect:()=>{}}] };
+  },
+  45: ()=>{
+    S.mobilizationAnnounced = true;
+    const wonAlready = S.studentStatus && S.resources.money>=10000000;
+    if(wonAlready){
+      return { title:'Объявлена мобилизация', kicker:'Итоги', text:'По стране объявляют мобилизацию — и именно в этот момент на счету Данила наконец нужная сумма, а сам он всё ещё числится студентом.', choices:[
+        { label:'Улететь в Таиланд', effect:()=>{ endGame('win','Таиланд','Деньги на счету, диплом на руках. Наконец можно позволить себе ту самую поездку, о которой шутили весь институт.'); } }
+      ]};
+    }
+    if(!S.studentStatus){
+      return { title:'Объявлена мобилизация', kicker:'По всей стране', text:'По стране объявляют мобилизацию. Данил на данный момент не восстановлен в институте — бронь не действует.', choices:[
+        { label:'...', effect:()=>{ endGame('over','Мобилизация','Мобилизация объявлена в тот момент, когда Данил не был восстановлен в институте — бронь не действует. За ним приезжают в тот же день.'); } }
+      ]};
+    }
+    return { title:'Объявлена мобилизация', kicker:'По всей стране', text:'По стране объявляют мобилизацию. Данил всё ещё числится студентом — бронь пока действует. Но нужной суммы на счету ещё нет: придётся тянуть дальше, а теперь любое отчисление будет означать не пересдачу, а повестку в тот же день.', choices:[
+      { label:'Понятно', effect:()=>{} }
+    ]};
   }
 };
 
@@ -780,23 +846,16 @@ function randomEventPool(){
     ]})}
   ];
   if(S.arkadiyUnlocked){
+    // Аркадий — decoративная линия: чем бы Данил с ним ни занялся, это ни на что не влияет,
+    // просто ещё один потраченный ход события.
     pool.push(
-      { id:'arkadiy_business', build:()=>{ const gain=Math.round(rnd(10000,30000)); return { title:'Разговор о бизнесе', kicker:'Отец Аркадий', text:'Начинает с пары слов о смирении, заканчивает связями в бизнес-тусовке.', choices:[
-        { label:'Договориться', effect:()=>{ S.resources.money+=gain; S.trust.arkadiy=clamp(S.trust.arkadiy+8,0,100); } },
-        { label:'Отделаться от нравоучений', effect:()=>{} }
-      ]};}},
-      { id:'arkadiy_choir', build:()=>({ title:'Церковный хор', kicker:'Отец Аркадий', text:'Зовёт на спевку — помогает привести мысли в порядок.', choices:[
-        { label:'Сходить', effect:()=>{ S.resources.stress=clamp(S.resources.stress-10,0,100); S.trust.arkadiy=clamp(S.trust.arkadiy+6,0,100); } },
-        { label:'Не сегодня', effect:()=>{} }
-      ]})},
-      { id:'arkadiy_bar', build:()=>({ title:'Бар с Аркадием', kicker:'Отец Аркадий', text:'Сам берёт что покрепче, Данилу — морс, и с серьёзным лицом рассказывает про инвесторов.', choices:[
-        { label:'Послушать', effect:()=>{ S.resources.stress=clamp(S.resources.stress-6,0,100); S.trust.arkadiy=clamp(S.trust.arkadiy+5,0,100); } },
-        { label:'Отговориться делами', effect:()=>{} }
-      ]})},
-      { id:'arkadiy_conference', build:()=>{ const gain=Math.round(rnd(40000,90000)); return { title:'«Россия — страна возможностей»', kicker:'Отец Аркадий', text:'Пробивает место на молодёжном бизнес-форуме.', choices:[
-        { label:'Поехать', effect:()=>{ S.resources.money+=gain; S.trust.arkadiy=clamp(S.trust.arkadiy+10,0,100); S.trust.upp=clamp(S.trust.upp+5,0,100); } },
-        { label:'Жалко времени', effect:()=>{} }
-      ]};}}
+      { id:'arkadiy_hangout', build:()=>({ title:'Отец Аркадий снова на связи', kicker:'Отец Аркадий', text:'Аркадий, как обычно, живее всех живых и зовёт провести вечер вместе — вариантов у него, как всегда, вагон.', choices:[
+        { label:'Пойти в бар', effect:()=>{} },
+        { label:'Поговорить о бизнесе', effect:()=>{} },
+        { label:'Помолиться', effect:()=>{} },
+        { label:'Потроллить его за неискреннюю благочестивость', effect:()=>{} },
+        { label:'Поехать на конференцию «Россия — страна возможностей»', effect:()=>{} }
+      ]})}
     );
   }
   if(S.vladosUnlocked){
@@ -856,18 +915,6 @@ function endGame(kind, title, text){
   S.gameOver = { kind, title, text };
   clearSave();
 }
-function finishGame(){
-  if(!S.studentStatus){
-    endGame('over','Мобилизация','Отчислен и не восстановлен на момент финальной проверки — бронь не действует. Дальше решают документы, не оценки.');
-    return;
-  }
-  if(S.resources.money>=10000000){
-    endGame('win','Таиланд','Деньги на счету, диплом на руках. Наконец можно позволить себе ту самую поездку, о которой шутили весь институт.');
-    return;
-  }
-  endGame('neutral','Открытый финал','Неделя 45. Студент, деньги — так себе. Ничего не взорвалось, ничего не изменилось — просто ещё один человек, который доучился.');
-}
-
 /* ============ СОХРАНЕНИЕ ============ */
 const SAVE_KEY = 'dekanat_save_v2';
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
@@ -918,12 +965,17 @@ function confirmAllocTurn(){
 function handleEventChoice(i){
   const m = S.modal;
   if(m && m.choices[i] && m.choices[i].effect) m.choices[i].effect();
-  if(S.log[0] && S.log[0].phase==='alloc') S.log[0].eventId = m._id;
+  if(S.log[0] && S.log[0].phase==='alloc' && !S.log[0].eventId) S.log[0].eventId = m._id;
+  if(S.chainedModal && !S.gameOver){
+    S.modal = S.chainedModal; S.chainedModal = null;
+    saveIfOngoing();
+    render();
+    return;
+  }
   S.modal = null;
   if(!S.gameOver){
     S.week += 1;
-    if(S.week>MAX_WEEKS){ finishGame(); }
-    else { S.turnPhase = 'alloc'; }
+    S.turnPhase = 'alloc';
   }
   saveIfOngoing();
   render();
@@ -1055,11 +1107,13 @@ function render(){
   const r = S.resources;
   const tier = escalationTier(r.escalation);
   const turnNumber = (S.week-1)*2 + (S.turnPhase==='alloc'?1:2);
+  const turnLabel = S.week>MAX_WEEKS ? `Ход ${turnNumber} (после мобилизации)` : `Ход ${turnNumber}/90`;
+  const weekLabel = S.week>MAX_WEEKS ? `Неделя ${S.week}` : `Неделя ${S.week}/${MAX_WEEKS}`;
 
   if(S.turnPhase==='event' && S.modal){
     app.innerHTML = `
       <h1>Деканат — менеджмент-версия</h1>
-      <p class="subtitle">Ход ${turnNumber}/90 · Неделя ${S.week}/${MAX_WEEKS} · Ход события · Директор института: ${S.directorName}</p>
+      <p class="subtitle">${turnLabel} · ${weekLabel} · Ход события · Директор института: ${S.directorName}</p>
       <div class="topbar">
         ${statCard('Деньги', fmt(r.money)+'₽', Math.min(100,r.money/100000), false)}
         ${statCard('Стресс', r.stress, r.stress, true)}
@@ -1082,7 +1136,7 @@ function render(){
 
   app.innerHTML = `
     <h1>Деканат — менеджмент-версия</h1>
-    <p class="subtitle">Ход ${turnNumber}/90 · Неделя ${S.week}/${MAX_WEEKS} · Ход распределения · Директор института: ${S.directorName} · <span class="status-badge ${S.studentStatus?'ok':'bad'}">${S.studentStatus?'Студент':'Отчислен'}</span></p>
+    <p class="subtitle">${turnLabel} · ${weekLabel} · Ход распределения · Директор института: ${S.directorName} · <span class="status-badge ${S.studentStatus?'ok':'bad'}">${S.studentStatus?'Студент':'Отчислен'}</span></p>
 
     <div class="topbar">
       ${statCard('Деньги', fmt(r.money)+'₽', Math.min(100,r.money/100000), false)}
@@ -1154,7 +1208,7 @@ function render(){
       </div>
     </div>
 
-    <footer>Данил · Юридический институт при Дале · общага №3 · ход ${turnNumber} из 90</footer>
+    <footer>Данил · Юридический институт при Дале · общага №3 · ${turnLabel.toLowerCase()}</footer>
   `;
 
   attachSliderHandlers();
