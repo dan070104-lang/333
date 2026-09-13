@@ -21,7 +21,7 @@
     --bad:#a8434a;
     --hue:0deg;
     --sat:100%;
-    --tint-r:168; --tint-g:40; --tint-b:40;
+    --tint-r:96; --tint-g:92; --tint-b:40;
     --tint:0;
     --grain:0;
     --serif:'PT Serif',Georgia,serif;
@@ -38,7 +38,7 @@
     filter:hue-rotate(var(--hue)) saturate(var(--sat));
     transition:filter 1.2s ease;
   }
-  .app{max-width:1200px;margin:0 auto;position:relative;}
+  .app{max-width:1220px;margin:0 auto;position:relative;}
   .app::after{
     content:"";
     position:fixed;inset:0;
@@ -67,6 +67,7 @@
   }
   .status-badge.ok{background:rgba(127,169,104,.18);color:var(--good);}
   .status-badge.bad{background:rgba(168,67,74,.2);color:var(--bad);}
+  .status-badge.neutral{background:rgba(150,160,180,.15);color:var(--text-dim);}
   .topbar{
     display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;
   }
@@ -104,6 +105,10 @@
     text-transform:uppercase;letter-spacing:.3px;
   }
   .pill.active{background:var(--accent);color:#0b1520;border-color:var(--accent);font-weight:700;}
+  .pill.tag-legal{border-color:#3d5a3d;}
+  .pill.tag-gray{border-color:#6b5d2f;}
+  .pill.tag-scam{border-color:#6b3030;}
+  .pill.tag-criminal{border-color:#6b3030;background:#241417;}
   .forecast-box{
     background:var(--panel-2);border:1px solid var(--border);border-left:3px solid var(--accent);
     border-radius:4px;padding:10px 12px;font-size:.8rem;line-height:1.6;
@@ -114,6 +119,7 @@
   .npc{
     background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;
   }
+  .npc.light{opacity:.85;}
   .npc-name{font-size:.78rem;font-weight:600;display:flex;justify-content:space-between;}
   .npc-name span{color:var(--text-dim);font-weight:400;font-family:var(--mono);}
   .npc input[type=range]{margin-top:6px;height:4px;}
@@ -128,22 +134,27 @@
     background:var(--panel-2);color:var(--text);border:1px solid var(--border);
     padding:9px 12px;border-radius:6px;cursor:pointer;font-size:.8rem;
   }
+  button.secondary:disabled{opacity:.45;cursor:not-allowed;}
   .report{
     background:var(--panel-2);border:1px solid var(--border);border-radius:6px;
-    padding:12px 14px;font-size:.85rem;line-height:1.65;white-space:pre-line;font-family:var(--serif);
+    padding:12px 14px;font-size:.83rem;line-height:1.6;white-space:pre-line;font-family:var(--mono);
   }
+  .report .rep-title{font-family:var(--serif);font-size:.78rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 2px;}
+  .report .rep-title:first-child{margin-top:0;}
   .modal-backdrop{
     position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;
     z-index:100;padding:16px;
   }
   .modal{
     background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--warn);
-    border-radius:8px;max-width:460px;width:100%;padding:20px;
+    border-radius:8px;max-width:480px;width:100%;padding:20px;max-height:90vh;overflow-y:auto;
   }
-  .modal h3{font-family:var(--serif);margin:0 0 10px;font-size:1.1rem;}
+  .modal.event-turn{border-top-color:var(--accent);}
+  .modal h3{font-family:var(--serif);margin:0 0 4px;font-size:1.1rem;}
+  .modal .kicker{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin-bottom:8px;}
   .modal p{font-size:.86rem;line-height:1.55;color:var(--text-dim);white-space:pre-line;}
-  .modal .choices{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
-  .modal .choices button{flex:1;min-width:120px;}
+  .modal .choices{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+  .modal .choices button{width:100%;text-align:left;}
   .endscreen{
     background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:24px;text-align:center;
   }
@@ -153,6 +164,13 @@
   .warn-inline{color:var(--bad);font-size:.75rem;margin-top:6px;}
   footer{text-align:center;color:var(--text-dim);font-size:.7rem;margin-top:20px;font-family:var(--mono);}
   .restore-box{background:var(--panel-2);border:1px solid var(--bad);border-left:3px solid var(--bad);border-radius:4px;padding:12px;margin-bottom:14px;font-size:.82rem;}
+  .shop-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
+  .shop-item{background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:.78rem;display:flex;flex-direction:column;gap:6px;}
+  .shop-item .name{font-weight:700;font-size:.8rem;}
+  .shop-item .price{font-family:var(--mono);color:var(--accent);}
+  .shop-item .cat{font-size:.62rem;text-transform:uppercase;letter-spacing:.4px;color:var(--text-dim);}
+  .shop-item .eff{color:var(--text-dim);font-size:.72rem;}
+  .shop-item.owned{border-color:var(--good);}
 </style>
 </head>
 <body>
@@ -162,18 +180,31 @@
 /* ============ КОНСТАНТЫ ============ */
 const MAX_WEEKS = 45;
 const BASE_BUDGET = 21;
-const DIM_COEF = [1,1,1,0.7,0.4,0.2]; // коэффициенты убывающей отдачи по номеру юнита
-const NPC_LABELS = { zemlekop:'Землекоп', upp:'Комиссия УПП', komendant:'Комендантша', director:'Директор института', kondratyuk:'Кондратюк', arkadiy:'Отец Аркадий', vlados:'Владос' };
-const TAILS_CRISIS_THRESHOLD = 50; // у Данила и так плохие отношения с деканатом — порог ниже "среднестатистического" (60)
-
+// единая кривая убывающей отдачи: 1-3 юнита - 100%, 4-5 - 70%, 6-7 - 40%, 8+ - 20%
+function unitRate(index){ // index = номер юнита, начиная с 1
+  if(index<=3) return 1;
+  if(index<=5) return 0.7;
+  if(index<=7) return 0.4;
+  return 0.2;
+}
 function effectiveUnits(n){
   if(n<=0) return 0;
   let sum=0;
-  for(let i=0;i<n;i++){
-    sum += i < DIM_COEF.length ? DIM_COEF[i] : 0.1;
-  }
+  for(let i=1;i<=n;i++) sum += unitRate(i);
   return sum;
 }
+const FULL_NODES = ['director','zemlekop','upp','vlados'];
+const LIGHT_NODES = ['arkadiy','kondratyuk'];
+const NPC_LABELS = {
+  director:'Директор института', zemlekop:'Землекоп', upp:'Комиссия УПП', vlados:'Владос',
+  arkadiy:'Отец Аркадий', kondratyuk:'Кондратюк'
+};
+const NPC_SUBLABEL = {
+  director:'администрация', zemlekop:'земельное право', upp:'Кузнецов/Комаров', vlados:'сосед по общаге',
+  arkadiy:'малозначимая линия', kondratyuk:'светлая линия'
+};
+const TAILS_CRISIS_THRESHOLD = 50;
+
 function escalationTier(esc){
   if(esc<26) return 1;
   if(esc<=50) return 2;
@@ -183,411 +214,591 @@ function escalationTier(esc){
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function rnd(a,b){ return a + Math.random()*(b-a); }
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function roundMoney(v){ return Math.round(v/500)*500; }
+function fmt(n){ return Math.round(n).toLocaleString('ru-RU'); }
+function priceMult(escalation){ return 1 + 0.15*Math.floor(escalation/25); }
 
-function getIncomeParams(units, type, tier){
+/* ============ ИМЕННЫЕ СХЕМЫ ЗАРАБОТКА ============ */
+// диапазоны заданы "на типичное вложение" (~4 юнита, эфф.≈3.7) и масштабируются юнитами
+const TYPICAL_EFF = 3.7;
+const SCHEMES = {
+  doc_translation:{ label:'Перевод документов (Сергей_ИП84)', cat:'legal', low:3000, high:10000, fail:0.08,
+    onFail:(lines)=>{ lines.push('Перевод документов: заказчик передумал — ушёл вечер, денег нет.'); } },
+  tutoring:{ label:'Репетиторство', cat:'legal', low:4000, high:12000, fail:0.10,
+    onFail:(lines)=>{ lines.push('Репетиторство: ученик заболел, занятие сорвалось.'); } },
+  copywriting:{ label:'Копирайтинг для юрфирмы', cat:'legal', low:5000, high:15000, fail:0.12,
+    onFail:(lines)=>{ lines.push('Копирайтинг: текст завернули на правки, в срок не уложились — оплаты нет.'); },
+    onSuccess:(lines)=>{ if(Math.random()<0.3){ S.trust.director=clamp(S.trust.director+3,0,100); lines.push('Фирма — партнёр института: хорошая работа долетела до администрации, доверие директора +3.'); } } },
+  courier:{ label:'Подработка курьером', cat:'legal', low:2000, high:6000, fail:0.05,
+    onFail:(lines)=>{ lines.push('Курьером: заказ отменили на середине маршрута.'); },
+    onSuccess:(lines)=>{ S.resources.stress=clamp(S.resources.stress+2,0,100); lines.push('Курьером: набегался — стресс +2 сверху, но деньги живые.'); } },
+  fake_certs:{ label:'Липовые справки об успеваемости', cat:'gray', low:15000, high:50000, fail:0.30,
+    onFail:(lines)=>{ S.trust.director=clamp(S.trust.director-12,0,100); S.resources.tails=clamp(S.resources.tails+10,0,100);
+      lines.push('Справки: подделку заметили — доверие директора −12, хвосты +10.'); } },
+  dropshipping:{ label:'Дропшиппинг', cat:'gray', low:10000, high:40000, fail:0.35,
+    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(10000*scale*0.4)); S.resources.money=Math.max(0,S.resources.money-lost);
+      lines.push(`Дропшиппинг: поставщик пропал вместе с предоплатой — минус ${fmt(lost)}₽.`); } },
+  leaked_tests:{ label:'Слив тестов УПП/земельного права', cat:'gray', low:8000, high:30000, fail:0.28,
+    onFail:(lines)=>{ const who = Math.random()<0.5 ? 'zemlekop':'upp'; const label = who==='zemlekop'?'Землекопа':'комиссии УПП';
+      S.trust[who]=clamp(S.trust[who]-10,0,100); S.resources.tails=clamp(S.resources.tails+6,0,100);
+      lines.push(`Слив тестов: спалились перед ${label} — доверие −10, хвосты +6.`); } },
+  crypto:{ label:'Крипто-биржа от знакомого', cat:'gray', low:20000, high:100000, fail:0.45,
+    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(20000*scale*0.5)); S.resources.money=Math.max(0,S.resources.money-lost);
+      lines.push(`Крипто-биржа: график ушёл не в ту сторону — минус ${fmt(lost)}₽ вложенного.`); } },
+  investclub:{ label:'Инвестклуб', cat:'scam', low:50000, high:400000, fail:0.80,
+    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(50000*scale*0.6)); S.resources.money=Math.max(0,S.resources.money-lost);
+      S.resources.stress=clamp(S.resources.stress+18,0,100);
+      lines.push(`Инвестклуб: пирамида схлопнулась — минус ${fmt(lost)}₽, стресс +18.`); } },
+  nft_pump:{ label:'NFT «гарантированный памп»', cat:'scam', low:45000, high:380000, fail:0.80,
+    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(45000*scale*0.6)); S.resources.money=Math.max(0,S.resources.money-lost);
+      S.resources.stress=clamp(S.resources.stress+16,0,100);
+      lines.push(`NFT: «памп» оказался сливом ликвидности — минус ${fmt(lost)}₽, стресс +16.`); } },
+  vlados_match:{ label:'Договорной матч (связи Владоса)', cat:'scam', low:60000, high:250000, fail:0.45,
+    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(30000*scale*0.4)); S.resources.money=Math.max(0,S.resources.money-lost);
+      S.resources.stress=clamp(S.resources.stress+10,0,100);
+      lines.push(`Договорной матч: не срослось — минус ${fmt(lost)}₽, стресс +10.`); },
+    criminal:12 },
+  vlados_deal:{ label:'Дело с Владосом', cat:'criminal', low:50000, high:250000, fail:0.30,
+    onFail:(lines)=>{ S.resources.stress=clamp(S.resources.stress+10,0,100); lines.push('Дело с Владосом: сорвалось в последний момент — стресс +10, ничего не заработано.'); },
+    onSuccess:(lines)=>{ S.trust.vlados=clamp(S.trust.vlados+6,0,100); lines.push('Дело с Владосом: сделано чисто, он это ценит — доверие Владоса +6.'); },
+    criminal:15 }
+};
+const LEGAL_IDS = ['doc_translation','tutoring','copywriting','courier'];
+const GRAY_IDS = ['fake_certs','dropshipping','leaked_tests','crypto'];
+const SCAM_IDS = ['investclub','nft_pump','vlados_match'];
+
+function sample(arr, n){
+  const copy = arr.slice(); const out=[];
+  while(out.length<n && copy.length){ out.push(copy.splice(Math.floor(Math.random()*copy.length),1)[0]); }
+  return out;
+}
+function rotateMarket(){
+  S.market = {
+    legal: sample(LEGAL_IDS, 3),
+    gray: sample(GRAY_IDS, 2),
+    scam: SCAM_IDS.filter(()=> Math.random() < 0.12 + 0.08*escalationTier(S.resources.escalation))
+  };
+  const avail = availableSchemeIds();
+  if(!avail.includes(S.incomeScheme)) S.incomeScheme = avail[0] || null;
+}
+function availableSchemeIds(){
+  const ids = [...S.market.legal, ...S.market.gray, ...S.market.scam];
+  if(S.vladosUnlocked) ids.push('vlados_deal');
+  return ids;
+}
+function schemeParams(id, units, tier){
+  const s = SCHEMES[id];
   const eff = effectiveUnits(units);
-  let low, high, fail;
-  if(type==='legal'){ low=eff*1600; high=eff*4500; fail=Math.min(0.35,0.05+0.01*eff); }
-  else if(type==='gray'){ low=eff*2300; high=eff*11000; fail=Math.min(0.6,0.25+0.03*eff); }
-  else if(type==='drone'){ low=eff*5500; high=eff*32000; fail=Math.min(0.8,0.4+0.05*eff); }
-  else { low=eff*4500; high=eff*24000; fail=Math.min(0.78,0.35+0.05*eff); } // scam
-  if(type==='legal'){
-    let mult=1;
-    if(tier===2) mult=0.7; else if(tier===3) mult=0.6; else if(tier===4) mult=0.5;
+  const scale = eff/TYPICAL_EFF;
+  let low = s.low*scale, high = s.high*scale;
+  let fail = s.fail;
+  if(s.cat==='legal' && tier>=2){
+    let mult = tier===2?0.7: tier===3?0.55:0.4;
     low*=mult; high*=mult;
   }
-  return {low,high,fail};
+  if(s.cat!=='legal') fail = clamp(fail + 0.015*(tier-1), 0, 0.9);
+  return { low, high, fail, scale };
 }
-function roundMoney(v){ return Math.round(v/500)*500; }
+
+/* ============ ВИТРИНА ДОРОГИХ ПОКУПОК ============ */
+const SHOP_ITEMS = {
+  sneakers:{ label:'Крутые кроссовки', price:20000, cat:'flex', stress:8, weeks:4 },
+  dinner:{ label:'Дорогой ужин «для сторис»', price:8000, cat:'flex', stress:6, weeks:2 },
+  donate:{ label:'Донат стримеру напоказ', price:6000, cat:'flex', stress:5, weeks:1 },
+  rostov:{ label:'Поездка в Ростов', price:6000, cat:'flex', stress:8, weeks:3 },
+  konspekt:{ label:'Конспект по земельному праву', price:5000, cat:'flex', stress:3, weeks:0, studyHelp:true },
+  chain:{ label:'Золотая цепочка', price:40000, cat:'status', stress:15, weeks:9, premium:false },
+  gucci:{ label:'Gucci (худи/кроссовки)', price:55000, cat:'status', stress:15, weeks:9 },
+  iphone:{ label:'iPhone последней модели', price:90000, cat:'status', stress:20, weeks:11 },
+  tsum:{ label:'Поездка в ЦУМ', price:15000, cat:'status', stress:10, weeks:3 },
+  watch:{ label:'Швейцарские часы (топ-реплика)', price:180000, cat:'premium', stress:25, weeks:16 },
+  tattoo:{ label:'Тату у известного мастера', price:60000, cat:'premium', stress:12, weeks:0 },
+  laptop:{ label:'Топовый ноутбук', price:150000, cat:'premium', stress:18, weeks:12, incomeBoost:true },
+  abroad:{ label:'Отпуск за границу (не Таиланд)', price:220000, cat:'premium', stress:30, weeks:6, residualStress:10 },
+  car:{ label:'Автомобиль (подержанная иномарка)', price:350000, cat:'structural', upkeep:5000, structuralEffect:'stress' },
+  apartment:{ label:'Съёмная квартира', price:30000, cat:'structural', upkeep:6250, structuralEffect:'life' }
+};
+function currentPrice(id){ return Math.round(SHOP_ITEMS[id].price * priceMult(S.resources.escalation) / 500)*500; }
+function decayFactor(){ return clamp(1 - 0.2*Math.floor(S.resources.escalation/25), 0.2, 1); }
+
+/* ============ КВИЗ-БАНК КОМИССИЙ ============ */
+const QUIZ_ZEMLEKOP = [
+  { q:'Что такое сервитут?', options:['Право ограниченного пользования чужим участком','Вид налога на землю','Форма аренды у государства','Штраф за самозахват'], correct:0 },
+  { q:'Какой орган ведёт государственный кадастровый учёт земельных участков?', options:['Росреестр','Роспотребнадзор','ФНС','Прокуратура'], correct:0 },
+  { q:'Что грозит за самовольное занятие земельного участка?', options:['Административный штраф','Ничего, если не заметили','Автоматическая конфискация дома','Только устное замечание'], correct:0 },
+  { q:'К какой категории относятся земли для выращивания сельхозкультур?', options:['Земли сельскохозяйственного назначения','Земли запаса','Земли лесного фонда','Земли особо охраняемых территорий'], correct:0 },
+  { q:'Что из перечисленного — основание для прекращения права собственности на землю?', options:['Отказ собственника от права','Простой факт долгого отсутствия хозяина','Устная договорённость с соседом','Смена времени года'], correct:0 }
+];
+const QUIZ_UPP = [
+  { q:'Сколько пересдач по одному предмету обычно допускается до отчисления?', options:['Две','Пятнадцать','Без ограничений','Ни одной'], correct:0 },
+  { q:'В какой срок нужно закрыть академическую задолженность после сессии?', options:['В установленный деканатом период следующего семестра','В течение трёх лет','Никогда, это не обязательно','В день пересдачи диплома'], correct:0 },
+  { q:'Куда подаётся заявление на восстановление после отчисления?', options:['В деканат/приёмную комиссию института','В МВД','В профсоюз соседней общаги','Никуда, восстановление невозможно'], correct:0 },
+  { q:'Что является основанием для вызова студента на комиссию по успеваемости?', options:['Академическая задолженность сверх нормы','Плохая погода','Смена причёски','Опоздание на одну пару'], correct:0 },
+  { q:'Кто утверждает итоговое решение комиссии по восстановлению?', options:['Директор института','Комендант общежития','Старший по этажу','Случайный прохожий'], correct:0 }
+];
 
 /* ============ СОСТОЯНИЕ ============ */
 function freshState(){
-  return {
+  const s = {
     week: 1,
+    turnPhase: 'alloc', // 'alloc' | 'event'
     started: false,
-    ended: false,
     gameOver: null,
+    directorEra: 'lazor',
     directorName: 'Лазор',
     studentStatus: true,
     restorations: 0,
-    mobilizationAnnounced: false,
-    conscriptionWeek: null,
-    dronesUnlocked: false,
-    resources: { money: 4000, stress: 25, food: 65, tails: 8, escalation: 0 },
-    trust: { zemlekop:50, upp:45, komendant:55, director:50, kondratyuk:82, arkadiy:40, vlados:60 },
-    crisisCounters: { tails:0, food:0, stress:0 },
-    breakdownChance: 0,
+    vladosUnlocked: false,
+    arkadiyUnlocked: false,
+    criminalWarned: false,
+    criminalFrozenUntil: 0,
+    kryakovtsevPromise: null, // { resolveWeek }
+    resources: { money: 4000, stress: 25, food: 60, tails: 8, escalation: 0, criminalRisk: 0 },
+    trust: { director:50, zemlekop:50, upp:45, vlados:0, arkadiy:0, kondratyuk:82 },
+    crisisCounters: { tails:0, food:0 },
     firedEvents: {},
-    modalQueue: [],
     modal: null,
+    pendingEventTurn: null,
     allocation: { study:4, income:4, life:4, relations:0, relief:0 },
-    incomeType: 'gray',
-    relationSplit: { zemlekop:0, upp:0, komendant:0, director:0, kondratyuk:0, arkadiy:0, vlados:0 },
+    incomeScheme: 'doc_translation',
+    relationSplit: { director:0, zemlekop:0, upp:0, vlados:0, arkadiy:0, kondratyuk:0 },
+    shop: {},
+    rentDueWeek: 4,
     log: []
   };
+  s.market = { legal:['doc_translation','tutoring','copywriting'], gray:['dropshipping'], scam:[] };
+  return s;
 }
 let S = freshState();
 
 /* ============ ПРАВИЛА БЮДЖЕТА ============ */
-function budgetFor(state){ return BASE_BUDGET; }
-function minLifeFor(state){ return escalationTier(state.resources.escalation) >= 4 ? 4 : 0; }
+function budgetFor(){ return BASE_BUDGET; }
+function minLifeFor(){ return escalationTier(S.resources.escalation) >= 4 ? 5 : 0; }
 function allocSum(a){ return a.study+a.income+a.life+a.relations+a.relief; }
 
-/* ============ НЕДЕЛЬНОЕ РАЗРЕШЕНИЕ ============ */
-function resolveWeek(){
+/* ============ ХОД РАСПРЕДЕЛЕНИЯ (недельная математика) ============ */
+function resolveAllocTurn(){
   const a = S.allocation;
   const tier = escalationTier(S.resources.escalation);
-  const lines = [];
+  const lines = { money:[], stress:[], food:[], tails:[], trust:[], flags:[] };
 
   // Учёба -> хвосты
   const effStudy = effectiveUnits(a.study);
-  const tailsDelta = Math.round(9 - 6*effStudy);
+  let tailsDelta = Math.round(9 - 6*effStudy);
+  if(S.shop.konspekt) tailsDelta -= 1;
+  const tailsBefore = S.resources.tails;
   S.resources.tails = clamp(S.resources.tails + tailsDelta, 0, 100);
-  if(tailsDelta<0) lines.push(`Учёба: хвосты сократились на ${-tailsDelta}.`);
-  else if(tailsDelta>0) lines.push(`Учёба: хвосты выросли на ${tailsDelta} — пар посещалось слишком мало.`);
-  else lines.push(`Учёба: без изменений — на грани.`);
-  if(S.resources.tails>=45 && !S.firedEvents.tailsWarning){
-    S.firedEvents.tailsWarning = true;
-    lines.push('Фон: в деканате на Данила и так смотрят косо — таких хвостов, как другим, ему могут не простить.');
-  }
+  lines.tails.push(`${tailsBefore}→${S.resources.tails} (юниты учёбы: ${a.study}${S.shop.konspekt?', конспект −1':''})`);
 
-  // Заработок
-  let moneyDelta = 0;
-  if(a.income>0){
-    const p = getIncomeParams(a.income, S.incomeType, tier);
+  // Заработок — именная схема
+  let moneyTotal = 0;
+  if(a.income>0 && S.incomeScheme && SCHEMES[S.incomeScheme]){
+    const s = SCHEMES[S.incomeScheme];
+    const p = schemeParams(S.incomeScheme, a.income, tier);
     const failed = Math.random() < p.fail;
     if(failed){
-      moneyDelta = Math.round(roundMoney(p.low*0.15));
-      const stressPenalty = S.incomeType==='drone' ? 15 : 10;
-      S.resources.stress = clamp(S.resources.stress+stressPenalty,0,100);
-      const failText = {
-        legal: 'Заказ сорвался, клиент не заплатил вовремя.',
-        gray: 'Схема прогорела — пришлось откатывать назад, почти без выхлопа.',
-        scam: 'Разводка не прошла — Данила чуть не спалили, доверие Землекопа просело.',
-        drone: 'Партия деталей ушла в брак, а перекупщик пропал со связи — деньги почти не отбились.'
-      }[S.incomeType];
-      lines.push(`Заработок (${incomeLabel(S.incomeType)}): ${failText} +${moneyDelta.toLocaleString('ru-RU')}₽, стресс +${stressPenalty}.`);
-      if(S.incomeType==='scam'){ S.trust.zemlekop = clamp(S.trust.zemlekop-5,0,100); }
+      s.onFail(lines.money, p.scale);
     } else {
-      moneyDelta = Math.round(roundMoney(rnd(p.low,p.high)));
-      lines.push(`Заработок (${incomeLabel(S.incomeType)}): схема выгорела, +${moneyDelta.toLocaleString('ru-RU')}₽.`);
+      const gain = Math.round(roundMoney(rnd(p.low,p.high)));
+      moneyTotal += gain;
+      lines.money.push(`${s.label}: +${fmt(gain)}₽`);
+      if(s.onSuccess) s.onSuccess(lines.money);
     }
-    S.resources.money = Math.max(0, S.resources.money + moneyDelta);
+    if(s.criminal){
+      S.resources.criminalRisk = clamp(S.resources.criminalRisk + s.criminal, 0, 100);
+      lines.flags.push(`Уголовный риск незаметно подрос (дело с Владосом).`);
+    }
   }
+  S.resources.money = Math.max(0, S.resources.money + moneyTotal);
 
-  // Быт -> шаурма
+  // Быт -> покупка еды (деньги) + сытость
   const effLife = effectiveUnits(a.life);
+  const lifeQuality = clamp(effLife/3.7, 0, 1); // 0..1, насколько эффективно тратит время на быт
+  const foodCost = Math.round((3000 - 1500*lifeQuality) * priceMult(S.resources.escalation));
+  const targetGain = 26;
   const decay = Math.round(rnd(8,14));
-  const foodGain = Math.round(effLife*16);
+  const affordable = Math.min(foodCost, S.resources.money);
+  const spendRatio = foodCost>0 ? affordable/foodCost : 0;
+  const foodGain = Math.round(targetGain*spendRatio);
+  S.resources.money = Math.max(0, S.resources.money - affordable);
   const foodBefore = S.resources.food;
   S.resources.food = clamp(S.resources.food - decay + foodGain, 0, 100);
-  lines.push(`Быт: сытость ${foodBefore}→${S.resources.food} (естественный расход −${decay}, забота +${foodGain}).`);
+  lines.food.push(`${foodBefore}→${S.resources.food} (расход −${decay}, закупка +${foodGain} за ${fmt(affordable)}₽)`);
+  if(affordable<foodCost) lines.flags.push(`Не хватило денег на полноценную еду — нужно было ${fmt(foodCost)}₽, потрачено ${fmt(affordable)}₽.`);
+
+  // Аренда общаги — периодический флейвор-платёж (не узел доверия)
+  if(S.week>=S.rentDueWeek){
+    const rent = Math.round(rnd(4000,6000)*priceMult(S.resources.escalation));
+    if(S.resources.money>=rent){
+      S.resources.money -= rent;
+      lines.money.push(`Оплата общежития: −${fmt(rent)}₽`);
+    } else {
+      S.resources.stress = clamp(S.resources.stress+10,0,100);
+      lines.flags.push('Не хватило денег на общагу — комендантша грозится штрафом, стресс +10.');
+    }
+    S.rentDueWeek += 4;
+  }
+
+  // Структурные покупки — recurring содержание
+  if(S.shop.car){ S.resources.money = Math.max(0,S.resources.money-5000); lines.money.push('Содержание машины: −5 000₽'); }
+  if(S.shop.apartment){ S.resources.money = Math.max(0,S.resources.money-6250); lines.money.push('Аренда квартиры: −6 250₽'); }
 
   // Разгрузка -> стресс
   const effRelief = effectiveUnits(a.relief);
   let stressChange = 5 - Math.round(effRelief*7);
-  if(S.resources.food===0) stressChange += 12;
-  if(tier===3) stressChange += 3;
-  if(tier===4) stressChange += 6;
+  const parts = [`база +5`, `разгрузка −${Math.round(effRelief*7)}`];
+  if(S.resources.food===0){ stressChange += 12; parts.push('голод +12'); }
+  if(tier===3){ stressChange += 3; parts.push('эскалация +3'); }
+  if(tier===4){ stressChange += 6; parts.push('эскалация +6'); }
+  if(S.shop.car){ stressChange -= 3; parts.push('машина −3'); }
+  if(S.shop.apartment){ stressChange -= 3; parts.push('квартира −3'); }
   const stressBefore = S.resources.stress;
   S.resources.stress = clamp(S.resources.stress + stressChange, 0, 100);
-  lines.push(`Стресс: ${stressBefore}→${S.resources.stress}.`);
+  lines.stress.push(`${stressBefore}→${S.resources.stress} (${parts.join(', ')})`);
 
-  // Отношения
-  const relEntries = Object.keys(NPC_LABELS);
-  let touched = [];
-  relEntries.forEach(k=>{
+  // Отношения — дрейф и адресная подпитка
+  Object.keys(NPC_LABELS).forEach(k=>{
     const units = S.relationSplit[k]||0;
+    const isFull = FULL_NODES.includes(k);
     if(units>0){
-      const gain = Math.round(units*13);
+      const gain = Math.round(8*effectiveUnits(units));
       S.trust[k] = clamp(S.trust[k]+gain,0,100);
-      touched.push(`${NPC_LABELS[k]} +${gain}`);
+      lines.trust.push(`${NPC_LABELS[k]}: +${gain} (вложено ${units})`);
     } else {
-      S.trust[k] = clamp(S.trust[k]-4,0,100);
+      const drift = isFull ? -4 : -1;
+      if(k==='director' && S.directorEra==='vasilina') { S.trust[k]=clamp(S.trust[k]-6,0,100); lines.trust.push(`${NPC_LABELS[k]}: −6 (дрейф эпохи Василины)`); }
+      else { S.trust[k] = clamp(S.trust[k]+drift,0,100); lines.trust.push(`${NPC_LABELS[k]}: ${drift} (без подпитки)`); }
     }
   });
-  if(touched.length) lines.push(`Отношения: ${touched.join(', ')}. Остальные контакты заметно остыли.`);
-  else lines.push(`Отношения: на этой неделе не было времени ни на кого — все связи быстро просели.`);
+  maybeKondratyukNarrative(lines.flags);
+  maybeCriminalNarrative(lines.flags);
 
-  // Кондратюк — фоновый дрейф собственного состояния
-  if(!S.relationSplit.kondratyuk){
-    S.trust.kondratyuk = clamp(S.trust.kondratyuk - 2, 0, 100);
-  }
-  maybeKondratyukNarrative(lines);
-
-  // Эскалация — фиксированный график + шум
-  const escBefore = S.resources.escalation;
-  S.resources.escalation = clamp(S.resources.escalation + 1 + Math.round(rnd(0,1)), 0, 100);
-
-  S.week += 1;
+  // Эскалация
+  S.resources.escalation = clamp(S.resources.escalation + 1 + Math.round(rnd(0,0.6)), 0, 100);
 
   // Кризисные счётчики
   S.crisisCounters.tails = S.resources.tails>=TAILS_CRISIS_THRESHOLD ? S.crisisCounters.tails+1 : 0;
   S.crisisCounters.food = S.resources.food===0 ? S.crisisCounters.food+1 : 0;
-  S.crisisCounters.stress = S.resources.stress>=90 ? S.crisisCounters.stress+1 : 0;
 
-  checkStoryEvents(lines);
-  checkCrises(lines);
-
-  S.log.unshift({ week: S.week-1, text: lines.join('\n') });
-  if(S.log.length>30) S.log.pop();
-
-  if(!S.gameOver && S.week>MAX_WEEKS){
-    finishGame();
+  // Жёсткие концовки, проверяемые сразу
+  if(S.resources.stress>=100){
+    endGame('over','Суицид', S.shop.konspekt
+      ? 'Стресс дошёл до предела. На столе — тот самый конспект по земельному праву, аккуратно исписанный. Даже это не помогло удержаться.'
+      : 'Стресс дошёл до предела. Никто не успел заметить, что с Данилом давно что-то не так.');
+    S.log.unshift({ week:S.week, phase:'alloc', lines });
+    return;
   }
+  if(S.crisisCounters.food>=2){
+    endGame('over','Смерть от голода','Вторая неделя подряд без денег на нормальную еду. Организм не выдержал.');
+    S.log.unshift({ week:S.week, phase:'alloc', lines });
+    return;
+  }
+
+  S.log.unshift({ week:S.week, phase:'alloc', lines });
+  if(S.log.length>40) S.log.pop();
+
+  S.turnPhase = 'event';
+  S.pendingEventTurn = buildEventTurn();
 }
 
-function incomeLabel(t){ return t==='legal'?'легальная': t==='gray'?'серая зона': t==='drone'?'дрон-подряды':'скам'; }
-
-function maybeKondratyukNarrative(lines){
+function maybeKondratyukNarrative(flagLines){
   const k = S.trust.kondratyuk;
-  if(k<=70 && !S.firedEvents.kond70){ S.firedEvents.kond70=true; lines.push('Фон: Кондратюк выглядит подавленным — баланс явно не сходится, но он ещё шутит про это.'); }
-  if(k<=40 && !S.firedEvents.kond40){ S.firedEvents.kond40=true; lines.push('Фон: Кондратюк почти не появляется — судя по всему, дела совсем плохи.'); }
-  if(k<=15 && !S.firedEvents.kond15){ S.firedEvents.kond15=true; lines.push('Фон: Кондратюк пропал на несколько дней. Данилу становится не по себе от этой новости.'); S.resources.stress=clamp(S.resources.stress+5,0,100); }
+  if(k<=60 && !S.firedEvents.kond60){ S.firedEvents.kond60=true; flagLines.push('Фон: Кондратюк выглядит подавленным — баланс явно не сходится, но он ещё шутит про это.'); }
+  if(k<=35 && !S.firedEvents.kond35){ S.firedEvents.kond35=true; flagLines.push('Фон: Кондратюк почти не появляется — судя по всему, дела совсем плохи.'); }
+  if(k<=10 && !S.firedEvents.kond10){ S.firedEvents.kond10=true; flagLines.push('Фон: Кондратюк пропал на несколько дней.'); }
+}
+function maybeCriminalNarrative(flagLines){
+  const r = S.resources.criminalRisk;
+  if(r>=40 && !S.firedEvents.crim40){ S.firedEvents.crim40=true; flagLines.push('Фон: кто-то из знакомых Владоса лишний раз спрашивал про Данила — возможно, просто любопытство.'); }
+  if(r>=70 && !S.firedEvents.crim70){ S.firedEvents.crim70=true; flagLines.push('Фон: в последнее время слишком много посторонних глаз вокруг.'); }
 }
 
-/* ============ СЮЖЕТНЫЕ СОБЫТИЯ ============ */
-function checkStoryEvents(lines){
+/* ============ ХОД СОБЫТИЯ ============ */
+function buildEventTurn(){
   const w = S.week;
-  if(w===8 && !S.firedEvents.lazor){
-    S.firedEvents.lazor = true;
-    S.resources.escalation = clamp(S.resources.escalation+5,0,100);
-    S.directorName = 'Кряковцев';
-    S.trust.director = Math.round(S.trust.director*0.7);
-    queueModal({
-      title:'Смена директора института',
-      text:'Лазор увольняют с поста директора юридического института. Кабинет занимает Кряковцев — новый человек, новые порядки, старые связи почти ничего не стоят.',
-      choices:[{label:'Понятно', effect:()=>{}}]
-    });
+
+  // жёсткая концовка по хвостам может уже наступить прямо сейчас
+  if(S.crisisCounters.tails>=2){
+    S.crisisCounters.tails=0;
+    return buildCommissionEvent();
   }
-  if(w===16 && !S.firedEvents.drones){
-    S.firedEvents.drones = true;
-    S.dronesUnlocked = true;
-    S.resources.escalation = clamp(S.resources.escalation+8,0,100);
-    queueModal({
-      title:'БПЛА-контракты',
-      text:'В городе появляются подряды, связанные со сборкой и обслуживанием дронов. Деньги заметно быстрее прежних раскладов серой зоны, но и риск попасть под вопросы — выше. В «Заработке» открывается новая опция.',
-      choices:[{label:'Взять на заметку', effect:()=>{}}]
-    });
+
+  const fixed = FIXED_EVENTS[w];
+  if(fixed && !S.firedEvents['fixed'+w]){
+    S.firedEvents['fixed'+w] = true;
+    return fixed();
   }
-  if(w===22 && !S.firedEvents.vasilina){
-    S.firedEvents.vasilina = true;
-    S.directorName = 'Василина';
-    S.trust.director = Math.round(S.trust.director*0.85);
-    queueModal({
-      title:'Ещё одна смена директора института',
-      text:'Кряковцева переводят в другой вуз. Кресло директора института занимает Василина — держится спокойнее, но присматривается ко всем заново.',
-      choices:[{label:'Понятно', effect:()=>{}}]
-    });
+
+  if(S.kryakovtsevPromise && S.kryakovtsevPromise.resolveWeek===w){
+    const promise = S.kryakovtsevPromise; S.kryakovtsevPromise = null;
+    S.resources.tails = clamp(S.resources.tails-15,0,100);
+    return { title:'Кряковцев сдержал слово', kicker:'Директор института', text:'Как и обещал, Кряковцев тихо закрыл часть хвостов через деканат — не быстро, но по-человечески.', choices:[{label:'Хорошо, что так', effect:()=>{}}] };
   }
-  if(w===28 && !S.firedEvents.mobilization){
-    S.firedEvents.mobilization = true;
-    S.mobilizationAnnounced = true;
-    S.resources.escalation = clamp(S.resources.escalation+15,0,100);
-    S.conscriptionWeek = w+3;
-    queueModal({
-      title:'Объявлена мобилизация',
-      text:'По стране объявляют мобилизацию. В общежитии только об этом и разговоры. Бронь студента внезапно перестаёт быть формальностью — если Данил вылетит из университета сейчас, документы решат всё.',
-      choices:[{label:'Принять к сведению', effect:()=>{}}]
-    });
+
+  if(w>=20 && S.resources.criminalRisk>0 && !(S.criminalFrozenUntil>=w)){
+    const chance = S.resources.criminalRisk/400;
+    if(Math.random()<chance) return buildPoliceEvent();
   }
-  if(S.mobilizationAnnounced && S.conscriptionWeek===w && !S.firedEvents.conscriptionCheck){
-    S.firedEvents.conscriptionCheck = true;
-    if(!S.studentStatus){
-      endGame('over','Потеря брони','Комиссия сверяет списки студентов с приказом об отчислении. Данил в списке отчисленных. Через неделю приходит повестка — бронь больше не действует.');
-    } else {
-      queueModal({ title:'Проверка призывной комиссии', text:'Списки сверены. Данил всё ещё числится студентом — бронь действует. Пронесло, на этот раз.', choices:[{label:'Выдохнуть', effect:()=>{}}] });
-    }
-  }
-  // случайное модальное событие — выбор из пула
-  if(w>=3 && S.modalQueue.length===0 && Math.random()<0.24){
-    const pool = randomEventPool();
-    if(pool.length){ queueModal(pick(pool).build()); }
-  }
+
+  const pool = randomEventPool();
+  const recent = S.log.slice(0,4).map(l=>l.eventId).filter(Boolean);
+  const filtered = pool.filter(e=>!recent.includes(e.id));
+  const chosen = pick(filtered.length?filtered:pool);
+  const built = chosen.build();
+  built._id = chosen.id;
+  return built;
 }
 
+function buildCommissionEvent(){
+  if(S.directorEra==='lazor'){
+    const cost = Math.round(rnd(15000,35000) * (0.5 + S.resources.tails/100));
+    return { title:'Вызов на комиссию', kicker:'Эпоха Лазор — вопрос решают деньги', text:`Хвосты накопились. При Лазор всё решается напрямую: занести ${fmt(cost)}₽ секретарю — и вопрос снят без комиссии.`, choices:[
+      { label:`Занести ${fmt(cost)}₽`, effect:()=>{
+          if(S.resources.money>=cost){ S.resources.money-=cost; S.resources.tails=clamp(S.resources.tails-25,0,100); }
+          else { S.studentStatus=false; }
+        } },
+      { label:'Отказаться / нечем платить', effect:()=>{ S.studentStatus=false; } }
+    ]};
+  }
+  const subject = Math.random()<0.5 ? 'zemlekop' : 'upp';
+  const bank = subject==='zemlekop' ? QUIZ_ZEMLEKOP : QUIZ_UPP;
+  const qi = Math.floor(Math.random()*bank.length);
+  const question = bank[qi];
+  const label = subject==='zemlekop' ? 'Землекоп (земельное право)' : 'Комиссия УПП (Кузнецов/Комаров)';
+  const choices = question.options.map((opt,i)=>({
+    label: opt,
+    effect: ()=>{
+      const isCorrect = i===question.correct;
+      const trusted = S.trust[subject]>=30;
+      if(isCorrect && trusted){ S.resources.tails=clamp(S.resources.tails-25,0,100); }
+      else { S.studentStatus = false; }
+    }
+  }));
+  if(S.directorEra==='kryakovtsev' && S.trust.director>=50){
+    choices.push({ label:'Попросить директора «разобраться по-человечески» (20 000₽)', effect:()=>{
+      if(S.resources.money>=20000){
+        S.resources.money-=20000; S.resources.tails=clamp(S.resources.tails-15,0,100);
+        S.kryakovtsevPromise = { resolveWeek: Math.min(MAX_WEEKS, S.week+3) };
+      } else { S.studentStatus=false; }
+    }});
+  }
+  return { title:'Вызов на комиссию', kicker:label, text:`Хвосты накопились настолько, что вызывают на комиссию. Формально верный ответ засчитают только при достаточном доверии — иначе сочтут угаданным.\n\nВопрос: ${question.q}`, choices };
+}
+
+function buildPoliceEvent(){
+  if(!S.criminalWarned){
+    S.criminalWarned = true;
+    S.criminalFrozenUntil = S.week+2;
+    const fine = Math.round(rnd(10000,40000));
+    return { title:'Интерес со стороны правоохранителей', kicker:'Предупреждение', text:`Вопросы задали — пока не всерьёз, но неприятно. Штраф ${fmt(fine)}₽, и на пару недель лучше залечь на дно.`, choices:[
+      { label:'Понятно', effect:()=>{ S.resources.money=Math.max(0,S.resources.money-fine); S.resources.stress=clamp(S.resources.stress+12,0,100); } }
+    ]};
+  }
+  if(S.resources.criminalRisk>70){
+    return { title:'Задержание', kicker:'', text:'На этот раз всерьёз — уголовное дело. Дальше уже не до диплома.', choices:[
+      { label:'...', effect:()=>{ endGame('over','Арест','Уголовное дело закрывает партию — независимо от денег на счету и оценок в зачётке.'); } }
+    ]};
+  }
+  return { title:'Ложная тревога', kicker:'', text:'Проверка «для профилактики» — на этот раз мимо. Но осадок остался.', choices:[
+    { label:'Выдохнуть', effect:()=>{ S.resources.stress=clamp(S.resources.stress+6,0,100); S.trust.director=clamp(S.trust.director-4,0,100); } }
+  ]};
+}
+
+/* ============ ФИКСИРОВАННЫЕ СЮЖЕТНЫЕ СОБЫТИЯ ПО НЕДЕЛЯМ ============ */
+const FIXED_EVENTS = {
+  5: ()=>{
+    S.resources.escalation = clamp(S.resources.escalation+8,0,100);
+    return { title:'Топбум', kicker:'Кондратюк', text:'Кондратюк с горящими глазами зовёт вложиться в топбум — сам искренне верит, что это шанс всей жизни.', choices:[
+      { label:'Вложить 30 000₽', effect:()=>{
+          if(S.resources.money>=30000){
+            S.resources.money-=30000;
+            if(Math.random()<0.85){ S.resources.stress=clamp(S.resources.stress+10,0,100); }
+            else { S.resources.money+=Math.round(rnd(60000,120000)); S.trust.kondratyuk=clamp(S.trust.kondratyuk+10,0,100); }
+          }
+        } },
+      { label:'Отказаться', effect:()=>{} }
+    ]};
+  },
+  9: ()=>{
+    S.resources.escalation = clamp(S.resources.escalation+10,0,100);
+    S.studentStatus = false;
+    return { title:'Первое отчисление', kicker:'Фиксированный сюжетный удар', text:'Приказ подписан безо всякой комиссии — формальность, накопившаяся с самого начала. Восстановление теперь — отдельная статья расходов.', choices:[{label:'...', effect:()=>{}}] };
+  },
+  13: ()=>{
+    S.resources.escalation = clamp(S.resources.escalation+10,0,100);
+    S.directorEra='kryakovtsev'; S.directorName='Кряковцев';
+    S.trust.director = Math.round(S.trust.director*0.4 + 50*0.6);
+    return { title:'Увольнение Лазор', kicker:'За коррупцию', text:'Лазор увольняют — вскрылись взятки. Прежняя схема «занести и забыть» больше не работает.', choices:[{label:'Понятно', effect:()=>{}}] };
+  },
+  14: ()=>{
+    S.resources.escalation = clamp(S.resources.escalation+2,0,100);
+    return { title:'Назначение Кряковцева', kicker:'Новый директор института', text:'Кряковцев реально помогает закрывать учебные проблемы — но небыстро и не бесплатно. Тон администрации заметно мягче.', choices:[{label:'Посмотрим', effect:()=>{}}] };
+  },
+  17: ()=>{
+    S.resources.escalation = clamp(S.resources.escalation+6,0,100);
+    S.arkadiyUnlocked = true;
+    return { title:'Отец Аркадий', kicker:'Новое знакомство', text:'В общаге появляется отец Аркадий — обаятельный, болтливый, с бизнес-связями и слабостью к красивой жизни.', choices:[{label:'Познакомиться', effect:()=>{}}] };
+  },
+  21: ()=>{
+    S.resources.escalation = clamp(S.resources.escalation+8,0,100);
+    S.vladosUnlocked = true;
+    return { title:'Владос', kicker:'Сосед по этажу', text:'Владос окончательно перестаёт быть просто соседом за стеной — криминальный бит, движухи, и предложения, от которых сложно отказаться.', choices:[{label:'Познакомиться поближе', effect:()=>{}}] };
+  },
+  30: ()=>{
+    S.resources.escalation = clamp(S.resources.escalation+10,0,100);
+    return { title:'Отставка Кряковцева', kicker:'Под давлением сверху', text:'Кряковцев уходит — не как злодей, а как человек, не готовый быть инструментом того, во что превращается его роль.', choices:[{label:'...', effect:()=>{}}] };
+  },
+  31: ()=>{
+    S.resources.escalation = clamp(S.resources.escalation+8,0,100);
+    S.directorEra='vasilina'; S.directorName='Василина';
+    S.trust.director = Math.round(S.trust.director*0.4 + 50*0.6);
+    return { title:'Назначение Василины', kicker:'Политический назначенец', text:'Депутат Василина занимает кабинет директора института. Дружить с ней мало — либо терпеть, либо отвечать её же оружием.', choices:[{label:'Понятно', effect:()=>{}}] };
+  }
+};
+
+/* ============ ПУЛ СЛУЧАЙНЫХ СОБЫТИЙ ХОДА-СОБЫТИЯ ============ */
 function randomEventPool(){
   const pool = [
-    { id:'networking', build:()=>{
-      const bonus = Math.round(rnd(15000,45000));
-      return { title:'Нетворкинг-предложение', text:`Знакомый предлагает разовую подработку — сразу ${bonus.toLocaleString('ru-RU')}₽ на руки, но нужно потратить вечер и слегка подпортить отношения с кем-то из комиссии УПП.`, choices:[
-        { label:'Согласиться', effect:()=>{ S.resources.money+=bonus; S.trust.upp=clamp(S.trust.upp-8,0,100); } },
-        { label:'Отказаться', effect:()=>{} }
-      ]};
-    }},
-    { id:'inspection', build:()=>{
-      const cost = Math.round(rnd(3000,8000));
-      return { title:'Внеплановая проверка комнаты', text:`Комендантша грозится внести замечание в личное дело за состояние комнаты. Можно решить вопрос деньгами, можно убрать самому и потерять вечер.`, choices:[
-        { label:`Занести ${cost.toLocaleString('ru-RU')}₽`, effect:()=>{ S.resources.money=Math.max(0,S.resources.money-cost); S.trust.komendant=clamp(S.trust.komendant+6,0,100); } },
-        { label:'Убрать самому', effect:()=>{ S.resources.stress=clamp(S.resources.stress+6,0,100); } }
-      ]};
-    }},
-    { id:'zemlekop_offer', build:()=>{
-      const gain = Math.round(rnd(20000,70000));
-      return { title:'Предложение Землекопа', text:'Землекоп зовёт на разовое дело покрупнее обычного — куш заметно больше стандартных схем, но и внимания к нему сейчас больше, чем обычно.', choices:[
-        { label:'Войти в долю', effect:()=>{
-            const risky = Math.random()<0.4;
-            if(risky){ S.resources.stress=clamp(S.resources.stress+12,0,100); S.trust.zemlekop=clamp(S.trust.zemlekop-10,0,100); }
-            else { S.resources.money+=gain; S.trust.zemlekop=clamp(S.trust.zemlekop+8,0,100); }
-          } },
-        { label:'Не в этот раз', effect:()=>{} }
-      ]};
-    }},
-    { id:'kondratyuk_loan', build:()=>{
-      const amount = Math.round(rnd(5000,20000));
-      return { title:'Кондратюк просит в долг', text:`Кондратюк, смущаясь, просит перехватить ${amount.toLocaleString('ru-RU')}₽ — говорит, что вот-вот всё отобьёт.`, choices:[
-        { label:'Дать в долг', effect:()=>{ S.resources.money=Math.max(0,S.resources.money-amount); S.trust.kondratyuk=clamp(S.trust.kondratyuk+10,0,100); } },
-        { label:'Отказать', effect:()=>{ S.trust.kondratyuk=clamp(S.trust.kondratyuk-6,0,100); } }
-      ]};
-    }},
-    { id:'status_purchase', build:()=>{
-      const cost = Math.round(rnd(15000,35000));
-      return { title:'Статусная покупка', text:'В витрине — вещь, о которой давно думал. Не по средствам, но именно сейчас очень хочется хоть какой-то нормальности.', choices:[
-        { label:`Купить за ${cost.toLocaleString('ru-RU')}₽`, effect:()=>{ if(S.resources.money>=cost){ S.resources.money-=cost; S.resources.stress=clamp(S.resources.stress-15,0,100); } } },
-        { label:'Не сейчас', effect:()=>{} }
-      ]};
-    }},
-    { id:'arkadiy_business', build:()=>{
-      const gain = Math.round(rnd(10000,30000));
-      return { title:'Разговор о бизнесе с отцом Аркадием', text:'Аркадий, как обычно, начинает с пары слов о смирении, а заканчивает связями в бизнес-тусовке — обещает свести с нужными людьми.', choices:[
-        { label:'Выслушать и договориться', effect:()=>{ S.resources.money+=gain; S.trust.arkadiy=clamp(S.trust.arkadiy+8,0,100); } },
-        { label:'Отделаться от нравоучений', effect:()=>{ S.trust.arkadiy=clamp(S.trust.arkadiy-4,0,100); } }
-      ]};
-    }},
-    { id:'arkadiy_choir', build:()=>{
-      return { title:'Церковный хор', text:'Аркадий зовёт на спевку — говорит, помогает привести мысли в порядок, даже если в бога особо не веришь.', choices:[
+    { id:'exam_surprise', build:()=>({ title:'Внеплановый зачёт', kicker:'Учёба', text:'Объявляют зачёт раньше графика — все в панике готовятся всю ночь.', choices:[
+      { label:'Готовиться всю ночь', effect:()=>{ S.resources.stress=clamp(S.resources.stress+8,0,100); S.resources.tails=clamp(S.resources.tails-6,0,100); } },
+      { label:'Понадеяться на удачу', effect:()=>{ S.resources.tails=clamp(S.resources.tails+8,0,100); } }
+    ]})},
+    { id:'stipend_delay', build:()=>{ const loss=Math.round(rnd(3000,8000)); return { title:'Задержка стипендии', kicker:'Деньги', text:'Бухгалтерия снова затянула выплаты.', choices:[
+      { label:'Понятно', effect:()=>{ S.resources.money=Math.max(0,S.resources.money-loss); } }
+    ]};}},
+    { id:'food_price_spike', build:()=>({ title:'Скачок цен на еду', kicker:'Рынок', text:'В киосках у общаги подняли цены — шаурма ощутимо подорожала.', choices:[
+      { label:'Придётся потерпеть', effect:()=>{ S.resources.food=clamp(S.resources.food-8,0,100); } }
+    ]})},
+    { id:'group_gift', build:()=>{ const cost=Math.round(rnd(1000,3000)); return { title:'Сбор на подарок преподавателю', kicker:'Одногруппники', text:'Группа скидывается на подарок к празднику.', choices:[
+      { label:`Скинуться ${fmt(cost)}₽`, effect:()=>{ S.resources.money=Math.max(0,S.resources.money-cost); S.trust.upp=clamp(S.trust.upp+3,0,100); } },
+      { label:'Не в этот раз', effect:()=>{} }
+    ]};}},
+    { id:'schedule_gap', build:()=>({ title:'Перенос пар', kicker:'Расписание', text:'Пары неожиданно переносят — освобождается вечер.', choices:[
+      { label:'Отдохнуть', effect:()=>{ S.resources.stress=clamp(S.resources.stress-5,0,100); } },
+      { label:'Поработать', effect:()=>{ S.resources.money+=Math.round(rnd(2000,5000)); } }
+    ]})},
+    { id:'roommate_noise', build:()=>({ title:'Шумная ночь в блоке', kicker:'Быт', text:'Соседи гуляют до утра — выспаться не вышло.', choices:[
+      { label:'Пожаловаться', effect:()=>{ S.resources.stress=clamp(S.resources.stress+4,0,100); } },
+      { label:'Присоединиться', effect:()=>{ S.resources.stress=clamp(S.resources.stress-6,0,100); } }
+    ]})},
+    { id:'lost_umbrella', build:()=>({ title:'Мелкая неприятность', kicker:'Быт', text:'То зонт сломался под ветром, то куртку залило дождём — обычная студенческая неделя.', choices:[
+      { label:'Ничего страшного', effect:()=>{ S.resources.stress=clamp(S.resources.stress+3,0,100); } }
+    ]})},
+    { id:'quiet_week', build:()=>({ title:'Спокойная неделя', kicker:'Штиль', text:'На удивление ничего особенного не происходит.', choices:[{label:'Ну и хорошо', effect:()=>{}}] })},
+    { id:'quiet_week2', build:()=>({ title:'Обычные будни', kicker:'Штиль', text:'Пары, очередь в столовой, ничего сверх программы.', choices:[{label:'Дальше', effect:()=>{}}] })},
+    { id:'library_find', build:()=>({ title:'Находка в библиотеке', kicker:'Учёба', text:'В методичке — чьи-то старые конспекты с решёнными задачами.', choices:[
+      { label:'Забрать себе', effect:()=>{ S.resources.tails=clamp(S.resources.tails-5,0,100); } }
+    ]})},
+    { id:'zemlekop_offer', build:()=>{ const gain=Math.round(rnd(20000,70000)); return { title:'Предложение Землекопа', kicker:'Землекоп', text:'Землекоп зовёт на разовое дело крупнее обычного.', choices:[
+      { label:'Войти в долю', effect:()=>{ const risky=Math.random()<0.4;
+          if(risky){ S.resources.stress=clamp(S.resources.stress+12,0,100); S.trust.zemlekop=clamp(S.trust.zemlekop-10,0,100); }
+          else { S.resources.money+=gain; S.trust.zemlekop=clamp(S.trust.zemlekop+8,0,100); } } },
+      { label:'Не в этот раз', effect:()=>{} }
+    ]};}},
+    { id:'kondratyuk_loan', build:()=>{ const amount=Math.round(rnd(5000,20000)); return { title:'Кондратюк просит в долг', kicker:'Кондратюк', text:`Смущаясь, просит перехватить ${fmt(amount)}₽.`, choices:[
+      { label:'Дать в долг', effect:()=>{ S.resources.money=Math.max(0,S.resources.money-amount); S.trust.kondratyuk=clamp(S.trust.kondratyuk+10,0,100); } },
+      { label:'Отказать', effect:()=>{ S.trust.kondratyuk=clamp(S.trust.kondratyuk-3,0,100); } }
+    ]};}},
+    { id:'kondratyuk_move', build:()=>({ title:'Кондратюк просит помочь с переездом', kicker:'Кондратюк', text:'Перевозит вещи в другую комнату — просит помочь на пару часов.', choices:[
+      { label:'Помочь', effect:()=>{ S.resources.stress=clamp(S.resources.stress+3,0,100); S.trust.kondratyuk=clamp(S.trust.kondratyuk+8,0,100); } },
+      { label:'Занят', effect:()=>{} }
+    ]})}
+  ];
+  if(S.arkadiyUnlocked){
+    pool.push(
+      { id:'arkadiy_business', build:()=>{ const gain=Math.round(rnd(10000,30000)); return { title:'Разговор о бизнесе', kicker:'Отец Аркадий', text:'Начинает с пары слов о смирении, заканчивает связями в бизнес-тусовке.', choices:[
+        { label:'Договориться', effect:()=>{ S.resources.money+=gain; S.trust.arkadiy=clamp(S.trust.arkadiy+8,0,100); } },
+        { label:'Отделаться от нравоучений', effect:()=>{} }
+      ]};}},
+      { id:'arkadiy_choir', build:()=>({ title:'Церковный хор', kicker:'Отец Аркадий', text:'Зовёт на спевку — помогает привести мысли в порядок.', choices:[
         { label:'Сходить', effect:()=>{ S.resources.stress=clamp(S.resources.stress-10,0,100); S.trust.arkadiy=clamp(S.trust.arkadiy+6,0,100); } },
         { label:'Не сегодня', effect:()=>{} }
-      ]};
-    }},
-    { id:'arkadiy_bar', build:()=>{
-      return { title:'Бар с Аркадием', text:'Аркадий зовёт в бар — сам берёт что покрепче, Данилу заказывает морс и с абсолютно серьёзным лицом рассказывает, как совмещает амвон с утренними встречами с инвесторами.', choices:[
-        { label:'Посидеть, послушать', effect:()=>{ S.resources.stress=clamp(S.resources.stress-6,0,100); S.trust.arkadiy=clamp(S.trust.arkadiy+5,0,100); } },
+      ]})},
+      { id:'arkadiy_bar', build:()=>({ title:'Бар с Аркадием', kicker:'Отец Аркадий', text:'Сам берёт что покрепче, Данилу — морс, и с серьёзным лицом рассказывает про инвесторов.', choices:[
+        { label:'Послушать', effect:()=>{ S.resources.stress=clamp(S.resources.stress-6,0,100); S.trust.arkadiy=clamp(S.trust.arkadiy+5,0,100); } },
         { label:'Отговориться делами', effect:()=>{} }
-      ]};
-    }},
-    { id:'vlados_party', build:()=>{
-      return { title:'Вписка у Владоса', text:'Владос устраивает вписку на весь этаж — бас такой, что дрожат стены. Комендантша уже поглядывает в их сторону.', choices:[
-        { label:'Остаться на вписке', effect:()=>{ S.resources.stress=clamp(S.resources.stress-10,0,100); S.trust.vlados=clamp(S.trust.vlados+8,0,100); S.trust.komendant=clamp(S.trust.komendant-5,0,100); } },
+      ]})},
+      { id:'arkadiy_conference', build:()=>{ const gain=Math.round(rnd(40000,90000)); return { title:'«Россия — страна возможностей»', kicker:'Отец Аркадий', text:'Пробивает место на молодёжном бизнес-форуме.', choices:[
+        { label:'Поехать', effect:()=>{ S.resources.money+=gain; S.trust.arkadiy=clamp(S.trust.arkadiy+10,0,100); S.trust.upp=clamp(S.trust.upp+5,0,100); } },
+        { label:'Жалко времени', effect:()=>{} }
+      ]};}}
+    );
+  }
+  if(S.vladosUnlocked){
+    pool.push(
+      { id:'vlados_party', build:()=>({ title:'Вписка у Владоса', kicker:'Владос', text:'Бас такой, что дрожат стены. Комендантша уже поглядывает в их сторону.', choices:[
+        { label:'Остаться', effect:()=>{ S.resources.stress=clamp(S.resources.stress-10,0,100); S.trust.vlados=clamp(S.trust.vlados+8,0,100); } },
         { label:'Свалить пораньше', effect:()=>{ S.trust.vlados=clamp(S.trust.vlados-3,0,100); } }
-      ]};
-    }},
-    { id:'vlados_scheme', build:()=>{
-      const gain = Math.round(rnd(25000,80000));
-      return { title:'Мутная тема Владоса', text:'Владос предлагает поучаствовать в разовой теме — что за товар, лучше не спрашивать. Деньги быстрые, но спалиться реально.', choices:[
-        { label:'Согласиться', effect:()=>{
-            const risky = Math.random()<0.4;
-            if(risky){ S.resources.stress=clamp(S.resources.stress+15,0,100); S.trust.vlados=clamp(S.trust.vlados-8,0,100); }
-            else { S.resources.money+=gain; S.trust.vlados=clamp(S.trust.vlados+10,0,100); }
-          } },
-        { label:'Не подписываться', effect:()=>{} }
-      ]};
-    }},
-    { id:'vlados_girls', build:()=>{
-      return { title:'Владос тащит знакомиться', text:'Владос говорит, что Данилу пора «разгружаться», а не сидеть в комнате с книжками, и тащит на район знакомиться.', choices:[
+      ]})},
+      { id:'vlados_girls', build:()=>({ title:'Владос тащит знакомиться', kicker:'Владос', text:'Говорит, что пора разгружаться, а не сидеть с книжками.', choices:[
         { label:'Сходить', effect:()=>{ S.resources.stress=clamp(S.resources.stress-12,0,100); S.trust.vlados=clamp(S.trust.vlados+5,0,100); } },
         { label:'Остаться дома', effect:()=>{} }
-      ]};
-    }},
-    { id:'vlados_trouble', build:()=>{
-      const cost = Math.round(rnd(10000,25000));
-      return { title:'Владос влип', text:`Владос влип в разборки и просит перехватить ${cost.toLocaleString('ru-RU')}₽, чтобы всё уладилось тихо.`, choices:[
+      ]})},
+      { id:'vlados_trouble', build:()=>{ const cost=Math.round(rnd(10000,25000)); return { title:'Владос влип', kicker:'Владос', text:`Просит перехватить ${fmt(cost)}₽, чтобы всё уладилось тихо.`, choices:[
         { label:'Помочь', effect:()=>{ S.resources.money=Math.max(0,S.resources.money-cost); S.trust.vlados=clamp(S.trust.vlados+12,0,100); } },
-        { label:'Не в этот раз', effect:()=>{ S.trust.vlados=clamp(S.trust.vlados-8,0,100); } }
-      ]};
-    }}
-  ];
-  if(S.dronesUnlocked){
-    pool.push({ id:'drone_check', build:()=>({ title:'Лишние вопросы', text:'Кто-то из старших курсов спрашивает слишком много деталей о том, откуда у Данила подряды на обслуживание дронов.', choices:[
-      { label:'Свести к шутке', effect:()=>{} },
-      { label:'Насторожиться', effect:()=>{ S.resources.stress=clamp(S.resources.stress+4,0,100); } }
-    ]}) });
+        { label:'Не в этот раз', effect:()=>{ S.trust.vlados=clamp(S.trust.vlados-10,0,100); S.resources.stress=clamp(S.resources.stress+10,0,100); } }
+      ]};}},
+      { id:'vlados_police_hide', build:()=>({ title:'Спрятать «до времени»', kicker:'Владос', text:'Просит подержать пакет у себя в комнате пару дней, ничего не объясняя.', choices:[
+        { label:'Согласиться', effect:()=>{ S.resources.criminalRisk=clamp(S.resources.criminalRisk+15,0,100); S.trust.vlados=clamp(S.trust.vlados+10,0,100); } },
+        { label:'Отказать наотрез', effect:()=>{ S.trust.vlados=clamp(S.trust.vlados-12,0,100); } }
+      ]})},
+      { id:'vlados_connect', build:()=>{ const gain=Math.round(rnd(30000,90000)); return { title:'Владос сватает «нужного человека»', kicker:'Владос', text:'Разовая возможность крупного заработка через его связи.', choices:[
+        { label:'Воспользоваться', effect:()=>{ S.resources.money+=gain; S.resources.criminalRisk=clamp(S.resources.criminalRisk+8,0,100); } },
+        { label:'Мимо', effect:()=>{} }
+      ]};}}
+    );
   }
-  if(S.trust.arkadiy>=40){
-    pool.push({ id:'arkadiy_conference', build:()=>{
-      const gain = Math.round(rnd(40000,90000));
-      return { title:'«Россия — страна возможностей»', text:'Аркадий пробивает Данилу место на молодёжном бизнес-форуме в местном бизнес-центре. Связи серьёзные, но и вложиться временем придётся.', choices:[
-        { label:'Поехать', effect:()=>{ S.resources.money+=gain; S.trust.arkadiy=clamp(S.trust.arkadiy+10,0,100); S.trust.upp=clamp(S.trust.upp+5,0,100); } },
-        { label:'Не поехать — жалко времени', effect:()=>{} }
-      ]};
-    }});
+  if(S.directorEra==='kryakovtsev'){
+    pool.push(
+      { id:'kryak_slow', build:()=>({ title:'Долго рассматривают', kicker:'Эпоха Кряковцева', text:'Даже готовое решение проходит бюрократию не сразу — это нужно закладывать в план.', choices:[{label:'Учту', effect:()=>{}}] })},
+      { id:'kryak_asks', build:()=>({ title:'Кряковцев советуется', kicker:'Эпоха Кряковцева', text:'Перед новой институтской политикой директор как бы советуется со студентами — жест человечности перед грядущей отставкой.', choices:[{label:'Ответить честно', effect:()=>{ S.trust.director=clamp(S.trust.director+3,0,100); } }] })}
+    );
+  }
+  if(S.directorEra==='vasilina'){
+    pool.push(
+      { id:'vasilina_troll', build:()=>({ title:'Публичный троллинг в чате курса', kicker:'Эпоха Василины', text:'Василина выкладывает пост с прямой издёвкой в адрес отстающих — упоминает и Данила.', choices:[
+        { label:'Стерпеть', effect:()=>{ S.resources.stress=clamp(S.resources.stress+10,0,100); } },
+        { label:'Ответить в её же стиле', effect:()=>{ S.resources.stress=clamp(S.resources.stress-8,0,100);
+            if(Math.random()<0.4){ S.trust.director=clamp(S.trust.director-15,0,100); S.resources.stress=clamp(S.resources.stress+10,0,100); } } }
+      ]})},
+      { id:'vasilina_check', build:()=>({ title:'Показательная проверка', kicker:'Эпоха Василины', text:'Внезапная проверка успеваемости с публичным разбором отстающих перед курсом.', choices:[
+        { label:'Пережить', effect:()=>{ S.resources.tails=clamp(S.resources.tails+8,0,100); S.resources.stress=clamp(S.resources.stress+6,0,100); } }
+      ]})},
+      { id:'vasilina_pr', build:()=>({ title:'PR-мероприятие', kicker:'Эпоха Василины', text:'«Встреча с молодёжью» для галочки — абсурд, но простой способ засветиться.', choices:[
+        { label:'Поучаствовать', effect:()=>{ S.trust.director=clamp(S.trust.director+5,0,100); } },
+        { label:'Пропустить', effect:()=>{} }
+      ]})}
+    );
   }
   return pool;
 }
 
-function checkCrises(lines){
-  if(S.crisisCounters.tails>=2 && !S.gameOver){
-    S.crisisCounters.tails=0;
-    const relevantTrust = Math.min(S.trust.upp, S.trust.director);
-    const pass = relevantTrust>=30;
-    if(pass){
-      S.resources.tails = clamp(S.resources.tails-25,0,100);
-      queueModal({ title:'Вызов на комиссию', text:`Хвосты накопились настолько, что вызывают на комиссию УПП. ${S.directorName===S.directorName?'':''}Связи и объяснения сработали — дают ещё один шанс закрыть долги.`, choices:[{label:'Выдохнуть', effect:()=>{}}] });
-    } else {
-      S.studentStatus = false;
-      queueModal({ title:'Отчисление', text:`Комиссия непреклонна: доверие к Данилу слишком низкое, объяснения не помогли. Приказ об отчислении подписан.`, choices:[{label:'...', effect:()=>{}}] });
-    }
-  }
-  if(S.crisisCounters.food>=2 && !S.gameOver){
-    S.resources.stress = clamp(S.resources.stress+25,0,100);
-    S.resources.food = 12;
-    queueModal({ title:'Кризис голода', text:'Вторая неделя без нормальной еды. Данил на грани — организм не выдерживает такого режима. Комендантша, заметив состояние, суёт пачку доширака.', choices:[{label:'Понятно', effect:()=>{}}] });
-    if(S.crisisCounters.food>=4){
-      endGame('over','Истощение','Организм не выдержал многонедельного голода. Данила увозят на скорой — доучиться в этом семестре уже не получится.');
-    }
-  }
-  if(S.crisisCounters.stress>=3 && !S.gameOver){
-    S.breakdownChance = clamp(S.breakdownChance+0.15, 0, 0.9);
-    if(Math.random()<S.breakdownChance){
-      endGame('over','Срыв','Недели на пределе стресса дают о себе знать. Срыв — и дальше уже не до университета.');
-    } else {
-      queueModal({ title:'На грани', text:'Стресс держится на критическом уровне уже несколько недель подряд. Пока держится — но это не может продолжаться бесконечно.', choices:[{label:'Держаться', effect:()=>{}}] });
-    }
-  } else if(S.resources.stress<90){
-    S.breakdownChance = 0;
-  }
-}
+/* ============ СЛОВАРЬ ЛОГА ДЛЯ АНТИ-ПОВТОРА ============ */
+// (сохраняем id последнего показанного события в S.log[0].eventId после выбора)
 
-function queueModal(m){ S.modalQueue.push(m); }
-function popModalIfNeeded(){
-  if(!S.modal && S.modalQueue.length>0 && !S.gameOver){
-    S.modal = S.modalQueue.shift();
-  }
-  if(S.gameOver && S.modal===null){ /* game over screen handled separately */ }
-}
-
+/* ============ ЗАВЕРШЕНИЕ ИГРЫ ============ */
 function endGame(kind, title, text){
   S.gameOver = { kind, title, text };
-  S.ended = true;
   clearSave();
 }
+function finishGame(){
+  if(!S.studentStatus){
+    endGame('over','Мобилизация','Отчислен и не восстановлен на момент финальной проверки — бронь не действует. Дальше решают документы, не оценки.');
+    return;
+  }
+  if(S.resources.money>=10000000){
+    endGame('win','Таиланд','Деньги на счету, диплом на руках. Наконец можно позволить себе ту самую поездку, о которой шутили весь институт.');
+    return;
+  }
+  endGame('neutral','Открытый финал','Неделя 45. Студент, деньги — так себе. Ничего не взорвалось, ничего не изменилось — просто ещё один человек, который доучился.');
+}
 
-/* ============ СОХРАНЕНИЕ ПРОГРЕССА (localStorage) ============ */
-const SAVE_KEY = 'dekanat_save_v1';
+/* ============ СОХРАНЕНИЕ ============ */
+const SAVE_KEY = 'dekanat_save_v2';
 function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
-function loadGame(){ try{ const raw = localStorage.getItem(SAVE_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; } }
+function loadGame(){ try{ const raw=localStorage.getItem(SAVE_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; } }
 function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
 function saveIfOngoing(){ if(!S.gameOver) saveGame(); }
-
-function finishGame(){
-  const money = S.resources.money;
-  const avgTrust = Math.round(Object.values(S.trust).reduce((a,b)=>a+b,0)/5);
-  let title, text;
-  if(money>3000000){
-    title='Диплом и капитал';
-    text=`Данил доходит до диплома с деньгами на счету (${money.toLocaleString('ru-RU')}₽). Схемы того стоили — вопрос в том, какой ценой это далось лично ему.`;
-  } else if(avgTrust>=65){
-    title='Диплом на связях';
-    text='Данил доучивается без взлётов, зато почти со всеми в общаге и деканате сохранились нормальные отношения. Не самый громкий, зато устойчивый результат.';
-  } else if(S.resources.stress>=70){
-    title='Диплом на измотанных нервах';
-    text='Данил дотягивает до диплома, но на пределе — три года выжимали досуха. Формально всё получилось.';
-  } else {
-    title='Просто диплом';
-    text='Ни взлётов, ни катастроф — Данил ровно дотянул семестры до диплома, стараясь никого не подвести и не потерять себя окончательно.';
-  }
-  endGame('win', title, text);
-}
 
 /* ============ ДЕЙСТВИЯ UI ============ */
 function setAlloc(key, val){
@@ -596,7 +807,6 @@ function setAlloc(key, val){
     const cap = S.allocation.relations;
     let sum = Object.values(S.relationSplit).reduce((a,b)=>a+b,0);
     if(sum>cap){
-      // урезаем пропорционально сверху вниз
       let excess = sum-cap;
       for(const k of Object.keys(S.relationSplit)){
         if(excess<=0) break;
@@ -614,25 +824,32 @@ function setRelation(npc, val){
   S.relationSplit[npc] = Math.min(v, Math.max(0, cap-others));
   render();
 }
-function setIncomeType(t){ S.incomeType = t; render(); }
-function confirmWeek(){
+function setScheme(id){ S.incomeScheme = id; render(); }
+function validAllocation(){
+  const sum = allocSum(S.allocation);
+  if(sum>budgetFor()) return false;
+  if(S.allocation.relations !== Object.values(S.relationSplit).reduce((a,b)=>a+b,0)) return false;
+  if(S.allocation.life < minLifeFor()) return false;
+  return true;
+}
+function confirmAllocTurn(){
   if(!validAllocation()) return;
-  resolveWeek();
-  popModalIfNeeded();
+  if((S.week-1)%5===0) rotateMarket();
+  resolveAllocTurn();
+  if(!S.gameOver){ S.modal = S.pendingEventTurn; S.pendingEventTurn = null; }
   saveIfOngoing();
   render();
 }
-function validAllocation(){
-  const sum = allocSum(S.allocation);
-  if(sum>budgetFor(S)) return false;
-  if(S.allocation.relations !== Object.values(S.relationSplit).reduce((a,b)=>a+b,0)) return false;
-  if(S.allocation.life < minLifeFor(S)) return false;
-  return true;
-}
-function closeModal(choice){
-  if(choice && choice.effect) choice.effect();
+function handleEventChoice(i){
+  const m = S.modal;
+  if(m && m.choices[i] && m.choices[i].effect) m.choices[i].effect();
+  if(S.log[0] && S.log[0].phase==='alloc') S.log[0].eventId = m._id;
   S.modal = null;
-  popModalIfNeeded();
+  if(!S.gameOver){
+    S.week += 1;
+    if(S.week>MAX_WEEKS){ finishGame(); }
+    else { S.turnPhase = 'alloc'; }
+  }
   saveIfOngoing();
   render();
 }
@@ -643,7 +860,6 @@ function tryRestore(){
     S.studentStatus = true;
     S.resources.tails = 50;
     S.restorations += 1;
-    S.log.unshift({ week:S.week, text:`Данил восстанавливается в университете за ${cost.toLocaleString('ru-RU')}₽. Хвосты частично сохраняются (50).` });
     saveIfOngoing();
     render();
   }
@@ -652,8 +868,37 @@ function restoreCost(){
   const tier = escalationTier(S.resources.escalation);
   let base = 150000 * Math.pow(1.8, S.restorations);
   if(tier===3) base *= 1.5;
-  if(tier===4) base *= 2;
+  if(tier===4) base *= 2.2;
+  base *= (1 - 0.3*(S.trust.director/100));
   return Math.round(base/1000)*1000;
+}
+function buyItem(id){
+  const item = SHOP_ITEMS[id];
+  const price = currentPrice(id);
+  if(S.resources.money<price || S.shop[id]) return;
+  S.resources.money -= price;
+  S.shop[id] = { boughtWeek:S.week, paid:price };
+  if(item.cat==='premium'){
+    const premiumCount = Object.keys(S.shop).filter(k=>SHOP_ITEMS[k] && SHOP_ITEMS[k].cat==='premium').length;
+    if(premiumCount>1) S.resources.criminalRisk = clamp(S.resources.criminalRisk+3,0,100);
+  }
+  if(item.stress){
+    const dec = decayFactor();
+    S.resources.stress = clamp(S.resources.stress - Math.round(item.stress*dec), 0, 100);
+  }
+  saveIfOngoing();
+  render();
+}
+function sellItem(id){
+  const item = SHOP_ITEMS[id];
+  const owned = S.shop[id];
+  if(!owned) return;
+  const frac = item.cat==='status' ? 0.5 : 0.4;
+  const refund = Math.round(owned.paid*frac/500)*500;
+  S.resources.money += refund;
+  delete S.shop[id];
+  saveIfOngoing();
+  render();
 }
 function restartGame(){ clearSave(); S = freshState(); render(); }
 function startGame(){ clearSave(); S = freshState(); S.started = true; saveGame(); render(); }
@@ -667,20 +912,16 @@ function continueGame(){
 function applyVisualTier(){
   const tier = escalationTier(S.resources.escalation);
   const root = document.documentElement;
-  // сдвиг палитры к хаки/оливковому по мере роста эскалации — военный крен вместо простого "тревожного красного"
   const map = {
-    1:{ hue:'0deg',  sat:'100%', tint:0,    grain:0    },
-    2:{ hue:'14deg', sat:'88%',  tint:0.03, grain:0.02 },
-    3:{ hue:'26deg', sat:'70%',  tint:0.07, grain:0.05 },
-    4:{ hue:'40deg', sat:'52%',  tint:0.13, grain:0.09 }
+    1:{ hue:'0deg',  sat:'100%', tint:0    , grain:0    },
+    2:{ hue:'14deg', sat:'88%',  tint:0.03 , grain:0.02 },
+    3:{ hue:'26deg', sat:'70%',  tint:0.07 , grain:0.05 },
+    4:{ hue:'40deg', sat:'52%',  tint:0.13 , grain:0.09 }
   };
   const t = map[tier];
   root.style.setProperty('--hue',t.hue);
   root.style.setProperty('--sat',t.sat);
   root.style.setProperty('--tint',t.tint);
-  root.style.setProperty('--tint-r','96');
-  root.style.setProperty('--tint-g','92');
-  root.style.setProperty('--tint-b','40');
   root.style.setProperty('--grain',t.grain);
 }
 
@@ -701,14 +942,13 @@ function render(){
     const saved = loadGame();
     app.innerHTML = `
       <h1>Деканат — менеджмент-версия</h1>
-      <p class="subtitle">Недельный дашборд управления временем Данила. ${MAX_WEEKS} недель, 21 юнит времени в неделю, никакой прокачки без компромиссов.</p>
+      <p class="subtitle">90 ходов на 45 недель · два хода в неделю: распределение + событие</p>
       <div class="panel">
         <p style="font-size:.85rem;color:var(--text-dim);line-height:1.6">
-        Каждую неделю ты распределяешь ограниченный бюджет юнитов времени между учёбой, заработком, бытом,
-        отношениями и разгрузкой. Перекос в одну категорию математически невыгоден — отдача с каждым
-        следующим юнитом падает. Кризисы наступают не от одной ошибки, а когда показатели держатся
-        за критическим порогом несколько недель подряд. У Данила и так натянутые отношения с деканатом —
-        вызов на комиссию грозит раньше, чем среднему студенту.
+        Каждую неделю — сначала ход распределения (бюджет юнитов времени по категориям), затем отдельный
+        ход события — модальное решение вне слайдеров. Еда и жильё стоят реальных денег. Отношения проседают
+        сами по себе без постоянной подпитки. Схемы заработка на рынке меняются по ходу игры и сильно отличаются
+        доходностью и риском. Дорогие покупки доступны в любой момент через отдельную витрину.
         </p>
         ${saved ? `
           <button class="confirm" onclick="continueGame()">Продолжить (неделя ${saved.week})</button>
@@ -717,19 +957,19 @@ function render(){
           <button class="confirm" onclick="startGame()">Начать семестр</button>
         `}
       </div>
-      <footer>Прототип по GDD «Деканат» — менеджмент-версия. Локальная симуляция, без сервера. Прогресс сохраняется в этом браузере.</footer>
+      <footer>Прототип по ТЗ «Деканат» — менеджмент-версия. Локальная симуляция, без сервера.</footer>
     `;
     return;
   }
 
   if(S.gameOver){
-    const kindColor = S.gameOver.kind==='win' ? 'var(--good)' : 'var(--bad)';
+    const kindColor = S.gameOver.kind==='win' ? 'var(--good)' : S.gameOver.kind==='neutral' ? 'var(--text-dim)' : 'var(--bad)';
     app.innerHTML = `
       <h1>Деканат — менеджмент-версия</h1>
       <div class="endscreen">
         <h2 style="color:${kindColor}">${S.gameOver.title}</h2>
         <p>${S.gameOver.text}</p>
-        <p style="font-size:.78rem;color:var(--text-dim)">Неделя: ${S.week-1}/${MAX_WEEKS} · Деньги: ${S.resources.money.toLocaleString('ru-RU')}₽ · Стресс: ${S.resources.stress} · Эскалация: ${S.resources.escalation}</p>
+        <p style="font-size:.78rem;color:var(--text-dim)">Неделя: ${Math.min(S.week,MAX_WEEKS)}/${MAX_WEEKS} · Деньги: ${fmt(S.resources.money)}₽ · Стресс: ${S.resources.stress} · Эскалация: ${S.resources.escalation}</p>
         <button class="secondary" onclick="restartGame()">Начать заново</button>
       </div>
     `;
@@ -738,20 +978,39 @@ function render(){
 
   const r = S.resources;
   const tier = escalationTier(r.escalation);
+  const turnNumber = (S.week-1)*2 + (S.turnPhase==='alloc'?1:2);
+
+  if(S.turnPhase==='event' && S.modal){
+    app.innerHTML = `
+      <h1>Деканат — менеджмент-версия</h1>
+      <p class="subtitle">Ход ${turnNumber}/90 · Неделя ${S.week}/${MAX_WEEKS} · Ход события · Директор института: ${S.directorName}</p>
+      <div class="topbar">
+        ${statCard('Деньги', fmt(r.money)+'₽', Math.min(100,r.money/100000), false)}
+        ${statCard('Стресс', r.stress, r.stress, true)}
+        ${statCard('Шаурма', r.food, r.food, false)}
+        ${statCard('Хвосты', r.tails, r.tails, true)}
+        ${statCard('Эскалация', r.escalation+' (ур.'+tier+')', r.escalation, true)}
+      </div>
+      ${modalHtml(S.modal, true)}
+      <footer>Данил · Юридический институт при Дале · общага №3</footer>
+    `;
+    return;
+  }
+
   const sum = allocSum(S.allocation);
-  const budget = budgetFor(S);
+  const budget = budgetFor();
   const remaining = budget - sum;
   const valid = validAllocation();
   const relSum = Object.values(S.relationSplit).reduce((a,b)=>a+b,0);
-
-  const forecast = S.allocation.income>0 ? getIncomeParams(S.allocation.income, S.incomeType, tier) : null;
+  const avail = availableSchemeIds();
+  const forecast = (S.allocation.income>0 && S.incomeScheme) ? schemeParams(S.incomeScheme, S.allocation.income, tier) : null;
 
   app.innerHTML = `
     <h1>Деканат — менеджмент-версия</h1>
-    <p class="subtitle">Неделя ${S.week} / ${MAX_WEEKS} · Директор института: ${S.directorName} · <span class="status-badge ${S.studentStatus?'ok':'bad'}">${S.studentStatus? 'Студент' : 'Отчислен'}</span></p>
+    <p class="subtitle">Ход ${turnNumber}/90 · Неделя ${S.week}/${MAX_WEEKS} · Ход распределения · Директор института: ${S.directorName} · <span class="status-badge ${S.studentStatus?'ok':'bad'}">${S.studentStatus?'Студент':'Отчислен'}</span></p>
 
     <div class="topbar">
-      ${statCard('Деньги', r.money.toLocaleString('ru-RU')+'₽', Math.min(100,r.money/100000), false)}
+      ${statCard('Деньги', fmt(r.money)+'₽', Math.min(100,r.money/100000), false)}
       ${statCard('Стресс', r.stress, r.stress, true)}
       ${statCard('Шаурма', r.food, r.food, false)}
       ${statCard('Хвосты', r.tails, r.tails, true)}
@@ -760,8 +1019,8 @@ function render(){
 
     ${!S.studentStatus ? `
       <div class="restore-box">
-        <b>Данил отчислен.</b> Восстановление стоит ${restoreCost().toLocaleString('ru-RU')}₽ (растёт с каждым разом и с эскалацией).
-        <div style="margin-top:8px;"><button class="secondary" ${r.money<restoreCost()?'disabled':''} onclick="tryRestore()">Восстановиться (${restoreCost().toLocaleString('ru-RU')}₽)</button></div>
+        <b>Данил отчислен.</b> Восстановление стоит ${fmt(restoreCost())}₽ (растёт с каждым разом, с эскалацией, дешевле при высоком доверии директора).
+        <div style="margin-top:8px;"><button class="secondary" ${r.money<restoreCost()?'disabled':''} onclick="tryRestore()">Восстановиться (${fmt(restoreCost())}₽)</button></div>
       </div>
     ` : ''}
 
@@ -772,13 +1031,10 @@ function render(){
           ${sliderRow('study','Учёба', S.allocation.study)}
           ${sliderRow('income','Заработок', S.allocation.income)}
           <div class="sub-options">
-            ${incomePill('legal','Легальная')}
-            ${incomePill('gray','Серая зона')}
-            ${incomePill('scam','Скам')}
-            ${S.dronesUnlocked ? incomePill('drone','БПЛА-подряды') : ''}
+            ${avail.map(id=>schemePill(id)).join('') || '<span style="color:var(--text-dim);font-size:.75rem">На рынке сейчас пусто — ждём ротации.</span>'}
           </div>
           ${sliderRow('life','Быт', S.allocation.life)}
-          ${minLifeFor(S)>0 && S.allocation.life<minLifeFor(S) ? `<div class="warn-inline">Высокая эскалация требует минимум ${minLifeFor(S)} юнита на быт.</div>` : ''}
+          ${minLifeFor()>0 && S.allocation.life<minLifeFor() ? `<div class="warn-inline">Высокая эскалация требует минимум ${minLifeFor()} юнита на быт.</div>` : ''}
           ${sliderRow('relations','Отношения', S.allocation.relations)}
           ${sliderRow('relief','Разгрузка', S.allocation.relief)}
           <div class="budget-line">
@@ -786,13 +1042,20 @@ function render(){
             <b class="${sum>budget?'over':''}">${sum} / ${budget}</b>
           </div>
           ${S.allocation.relations !== relSum ? `<div class="warn-inline">Распредели все юниты «Отношений» между конкретными людьми ниже (${relSum}/${S.allocation.relations}).</div>` : ''}
-          <button class="confirm" ${valid?'':'disabled'} onclick="confirmWeek()">Подтвердить неделю</button>
+          <button class="confirm" ${valid?'':'disabled'} onclick="confirmAllocTurn()">Подтвердить ход распределения</button>
         </div>
 
         <div class="panel">
-          <h2>Отношения <small>распредели юниты категории «Отношения»</small></h2>
+          <h2>Отношения <small>дрейф без подпитки: полные узлы −4/нед, лёгкие −1/нед</small></h2>
           <div class="npc-grid">
             ${Object.keys(NPC_LABELS).map(k=>npcCard(k)).join('')}
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Витрина <small>доступна в любой момент, за деньги, не за юниты</small></h2>
+          <div class="shop-grid">
+            ${Object.keys(SHOP_ITEMS).map(id=>shopItemCard(id)).join('')}
           </div>
         </div>
       </div>
@@ -802,27 +1065,42 @@ function render(){
           <h2>Прогноз риска</h2>
           ${forecast ? `
             <div class="forecast-box">
-              Заработок (${incomeLabel(S.incomeType)}), ${S.allocation.income} юнита вложено →<br>
-              прогноз: <span class="num">${Math.round(forecast.low).toLocaleString('ru-RU')}–${Math.round(forecast.high).toLocaleString('ru-RU')}₽</span><br>
+              ${SCHEMES[S.incomeScheme].label}, ${S.allocation.income} юнита вложено →<br>
+              прогноз: <span class="num">${fmt(forecast.low)}–${fmt(forecast.high)}₽</span><br>
               риск провала: <span class="risk">~${Math.round(forecast.fail*100)}%</span>
-              ${tier>=2 && S.incomeType==='legal' ? `<div class="tier-note">Легальный рынок просел из-за эскалации — доходность снижена.</div>`:''}
+              ${SCHEMES[S.incomeScheme].cat==='legal' && tier>=2 ? `<div class="tier-note">Легальный рынок просел из-за эскалации.</div>`:''}
+              ${SCHEMES[S.incomeScheme].criminal ? `<div class="tier-note">Участие повышает уголовный риск независимо от исхода.</div>`:''}
             </div>
-          ` : `<div class="forecast-box">Юниты в «Заработок» не вложены — дохода не будет.</div>`}
+          ` : `<div class="forecast-box">Юниты в «Заработок» не вложены или схема не выбрана — дохода не будет.</div>`}
         </div>
 
         <div class="panel">
-          <h2>Отчёт недели</h2>
-          <div class="report">${S.log.length? S.log[0].text : 'Семестр только начинается.'}</div>
+          <h2>Отчёт хода</h2>
+          <div class="report">${renderReport()}</div>
         </div>
       </div>
     </div>
 
-    <footer>Данил · Далевский университет · общага №3 · неделя ${S.week} из ${MAX_WEEKS}</footer>
-
-    ${S.modal ? modalHtml(S.modal) : ''}
+    <footer>Данил · Юридический институт при Дале · общага №3 · ход ${turnNumber} из 90</footer>
   `;
 
   attachSliderHandlers();
+}
+
+function renderReport(){
+  if(!S.log.length) return 'Семестр только начинается.';
+  const entry = S.log[0];
+  if(!entry.lines) return 'Ход события завершён.';
+  const L = entry.lines;
+  const sec = (title, arr)=> arr && arr.length ? `<div class="rep-title">${title}</div>${arr.join('\n')}` : '';
+  return [
+    sec('Заработок и расходы', L.money),
+    sec('Стресс', L.stress),
+    sec('Быт', L.food),
+    sec('Хвосты', L.tails),
+    sec('Отношения', L.trust),
+    sec('Фон', L.flags)
+  ].filter(Boolean).join('\n');
 }
 
 function statCard(label, value, pct, invert){
@@ -832,7 +1110,6 @@ function statCard(label, value, pct, invert){
     <div class="bar"><i style="width:${clamp(pct,0,100)}%;background:${barColor(pct,invert)}"></i></div>
   </div>`;
 }
-
 function sliderRow(key,label,value){
   const eff = effectiveUnits(value).toFixed(1);
   return `<div class="slider-row">
@@ -840,31 +1117,45 @@ function sliderRow(key,label,value){
     <input type="range" min="0" max="21" value="${value}" data-key="${key}" class="alloc-slider">
   </div>`;
 }
-function incomePill(type,label){
-  return `<div class="pill ${S.incomeType===type?'active':''}" onclick="setIncomeType('${type}')">${label}</div>`;
+function schemePill(id){
+  const s = SCHEMES[id];
+  return `<div class="pill tag-${s.cat} ${S.incomeScheme===id?'active':''}" onclick="setScheme('${id}')">${s.label}</div>`;
 }
 function npcCard(k){
   const val = S.relationSplit[k]||0;
   const trust = S.trust[k];
-  const label = k==='kondratyuk' ? NPC_LABELS[k]+' (состояние)' : NPC_LABELS[k];
-  return `<div class="npc">
-    <div class="npc-name">${label} <span>${trust}</span></div>
+  const isFull = FULL_NODES.includes(k);
+  return `<div class="npc ${isFull?'':'light'}">
+    <div class="npc-name">${NPC_LABELS[k]} <span>${trust}</span></div>
     <div class="bar"><i style="width:${trust}%;background:${barColor(trust,false)}"></i></div>
     <input type="range" min="0" max="21" value="${val}" data-npc="${k}" class="npc-slider">
-    <span class="lock">юнитов: ${val}</span>
+    <span class="lock">юнитов: ${val} · ${NPC_SUBLABEL[k]}</span>
   </div>`;
 }
-function modalHtml(m){
-  return `<div class="modal-backdrop"><div class="modal">
+function shopItemCard(id){
+  const item = SHOP_ITEMS[id];
+  const owned = S.shop[id];
+  const price = currentPrice(id);
+  const dur = item.weeks>0 ? `${item.weeks} нед.` : (item.weeks===0 ? 'постоянно/разово' : '');
+  return `<div class="shop-item ${owned?'owned':''}">
+    <div class="name">${item.label}</div>
+    <div class="cat">${item.cat}${item.upkeep?` · содержание ${fmt(item.upkeep)}₽/нед`:''}</div>
+    <div class="eff">${item.stress?`−${item.stress} стресс`:''}${item.structuralEffect==='stress'?'структурно снижает стресс':''}${item.structuralEffect==='life'?'дешевле быт, ниже фон стресса':''}${item.incomeBoost?', чуть эффективнее заработок':''}${item.studyHelp?', −1 к приросту хвостов':''} ${dur?`(${dur})`:''}</div>
+    ${owned
+      ? `<button class="secondary" onclick="sellItem('${id}')">Продать за ${fmt(Math.round(owned.paid*(item.cat==='status'?0.5:0.4)/500)*500)}₽</button>`
+      : `<button class="secondary" ${S.resources.money<price?'disabled':''} onclick="buyItem('${id}')">Купить за ${fmt(price)}₽</button>`}
+  </div>`;
+}
+function modalHtml(m, isEventTurn){
+  return `<div class="modal-backdrop"><div class="modal ${isEventTurn?'event-turn':''}">
+    ${m.kicker?`<div class="kicker">${m.kicker}</div>`:''}
     <h3>${m.title}</h3>
     <p>${m.text}</p>
     <div class="choices">
-      ${m.choices.map((c,i)=>`<button class="secondary" onclick="handleModalChoice(${i})">${c.label}</button>`).join('')}
+      ${m.choices.map((c,i)=>`<button class="secondary" onclick="handleEventChoice(${i})">${c.label}</button>`).join('')}
     </div>
   </div></div>`;
 }
-function handleModalChoice(i){ closeModal(S.modal.choices[i]); }
-
 function attachSliderHandlers(){
   document.querySelectorAll('.alloc-slider').forEach(el=>{
     el.addEventListener('input', e=> setAlloc(e.target.dataset.key, e.target.value));
