@@ -163,7 +163,7 @@
 const MAX_WEEKS = 45;
 const BASE_BUDGET = 21;
 const DIM_COEF = [1,1,1,0.7,0.4,0.2]; // коэффициенты убывающей отдачи по номеру юнита
-const NPC_LABELS = { zemlekop:'Землекоп', upp:'Комиссия УПП', komendant:'Комендантша', director:'Директор', kondratyuk:'Кондратюк' };
+const NPC_LABELS = { zemlekop:'Землекоп', upp:'Комиссия УПП', komendant:'Комендантша', director:'Директор института', kondratyuk:'Кондратюк', arkadiy:'Отец Аркадий', vlados:'Владос' };
 const TAILS_CRISIS_THRESHOLD = 50; // у Данила и так плохие отношения с деканатом — порог ниже "среднестатистического" (60)
 
 function effectiveUnits(n){
@@ -187,10 +187,10 @@ function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function getIncomeParams(units, type, tier){
   const eff = effectiveUnits(units);
   let low, high, fail;
-  if(type==='legal'){ low=eff*1500; high=eff*4000; fail=Math.min(0.35,0.05+0.01*eff); }
-  else if(type==='gray'){ low=eff*2000; high=eff*9000; fail=Math.min(0.6,0.25+0.03*eff); }
-  else if(type==='drone'){ low=eff*5000; high=eff*28000; fail=Math.min(0.8,0.4+0.05*eff); }
-  else { low=eff*4000; high=eff*20000; fail=Math.min(0.78,0.35+0.05*eff); } // scam
+  if(type==='legal'){ low=eff*1600; high=eff*4500; fail=Math.min(0.35,0.05+0.01*eff); }
+  else if(type==='gray'){ low=eff*2300; high=eff*11000; fail=Math.min(0.6,0.25+0.03*eff); }
+  else if(type==='drone'){ low=eff*5500; high=eff*32000; fail=Math.min(0.8,0.4+0.05*eff); }
+  else { low=eff*4500; high=eff*24000; fail=Math.min(0.78,0.35+0.05*eff); } // scam
   if(type==='legal'){
     let mult=1;
     if(tier===2) mult=0.7; else if(tier===3) mult=0.6; else if(tier===4) mult=0.5;
@@ -214,7 +214,7 @@ function freshState(){
     conscriptionWeek: null,
     dronesUnlocked: false,
     resources: { money: 4000, stress: 25, food: 65, tails: 8, escalation: 0 },
-    trust: { zemlekop:50, upp:45, komendant:55, director:50, kondratyuk:82 },
+    trust: { zemlekop:50, upp:45, komendant:55, director:50, kondratyuk:82, arkadiy:40, vlados:60 },
     crisisCounters: { tails:0, food:0, stress:0 },
     breakdownChance: 0,
     firedEvents: {},
@@ -222,7 +222,7 @@ function freshState(){
     modal: null,
     allocation: { study:4, income:4, life:4, relations:0, relief:0 },
     incomeType: 'gray',
-    relationSplit: { zemlekop:0, upp:0, komendant:0, director:0, kondratyuk:0 },
+    relationSplit: { zemlekop:0, upp:0, komendant:0, director:0, kondratyuk:0, arkadiy:0, vlados:0 },
     log: []
   };
 }
@@ -241,7 +241,7 @@ function resolveWeek(){
 
   // Учёба -> хвосты
   const effStudy = effectiveUnits(a.study);
-  const tailsDelta = Math.round(6 - 5*effStudy);
+  const tailsDelta = Math.round(9 - 6*effStudy);
   S.resources.tails = clamp(S.resources.tails + tailsDelta, 0, 100);
   if(tailsDelta<0) lines.push(`Учёба: хвосты сократились на ${-tailsDelta}.`);
   else if(tailsDelta>0) lines.push(`Учёба: хвосты выросли на ${tailsDelta} — пар посещалось слишком мало.`);
@@ -277,18 +277,18 @@ function resolveWeek(){
 
   // Быт -> шаурма
   const effLife = effectiveUnits(a.life);
-  const decay = Math.round(rnd(5,8));
-  const foodGain = Math.round(effLife*12);
+  const decay = Math.round(rnd(8,14));
+  const foodGain = Math.round(effLife*16);
   const foodBefore = S.resources.food;
   S.resources.food = clamp(S.resources.food - decay + foodGain, 0, 100);
   lines.push(`Быт: сытость ${foodBefore}→${S.resources.food} (естественный расход −${decay}, забота +${foodGain}).`);
 
   // Разгрузка -> стресс
   const effRelief = effectiveUnits(a.relief);
-  let stressChange = 3 - Math.round(effRelief*4);
-  if(S.resources.food===0) stressChange += 10;
-  if(tier===3) stressChange += 2;
-  if(tier===4) stressChange += 4;
+  let stressChange = 5 - Math.round(effRelief*7);
+  if(S.resources.food===0) stressChange += 12;
+  if(tier===3) stressChange += 3;
+  if(tier===4) stressChange += 6;
   const stressBefore = S.resources.stress;
   S.resources.stress = clamp(S.resources.stress + stressChange, 0, 100);
   lines.push(`Стресс: ${stressBefore}→${S.resources.stress}.`);
@@ -299,19 +299,19 @@ function resolveWeek(){
   relEntries.forEach(k=>{
     const units = S.relationSplit[k]||0;
     if(units>0){
-      const gain = Math.round(units*9);
+      const gain = Math.round(units*13);
       S.trust[k] = clamp(S.trust[k]+gain,0,100);
       touched.push(`${NPC_LABELS[k]} +${gain}`);
     } else {
-      S.trust[k] = clamp(S.trust[k]-2,0,100);
+      S.trust[k] = clamp(S.trust[k]-4,0,100);
     }
   });
-  if(touched.length) lines.push(`Отношения: ${touched.join(', ')}. Остальные контакты слегка остыли.`);
-  else lines.push(`Отношения: на этой неделе не было времени ни на кого — все связи немного просели.`);
+  if(touched.length) lines.push(`Отношения: ${touched.join(', ')}. Остальные контакты заметно остыли.`);
+  else lines.push(`Отношения: на этой неделе не было времени ни на кого — все связи быстро просели.`);
 
   // Кондратюк — фоновый дрейф собственного состояния
   if(!S.relationSplit.kondratyuk){
-    S.trust.kondratyuk = clamp(S.trust.kondratyuk - 1, 0, 100);
+    S.trust.kondratyuk = clamp(S.trust.kondratyuk - 2, 0, 100);
   }
   maybeKondratyukNarrative(lines);
 
@@ -355,8 +355,8 @@ function checkStoryEvents(lines){
     S.directorName = 'Кряковцев';
     S.trust.director = Math.round(S.trust.director*0.7);
     queueModal({
-      title:'Смена директора',
-      text:'Лазор увольняют с поста директора общежития. Кабинет занимает Кряковцев — новый человек, новые порядки, старые связи почти ничего не стоят.',
+      title:'Смена директора института',
+      text:'Лазор увольняют с поста директора юридического института. Кабинет занимает Кряковцев — новый человек, новые порядки, старые связи почти ничего не стоят.',
       choices:[{label:'Понятно', effect:()=>{}}]
     });
   }
@@ -375,8 +375,8 @@ function checkStoryEvents(lines){
     S.directorName = 'Василина';
     S.trust.director = Math.round(S.trust.director*0.85);
     queueModal({
-      title:'Ещё одна смена директора',
-      text:'Кряковцева переводят в другой корпус. За стол садится Василина — держится спокойнее, но присматривается ко всем заново.',
+      title:'Ещё одна смена директора института',
+      text:'Кряковцева переводят в другой вуз. Кресло директора института занимает Василина — держится спокойнее, но присматривается ко всем заново.',
       choices:[{label:'Понятно', effect:()=>{}}]
     });
   }
@@ -400,7 +400,7 @@ function checkStoryEvents(lines){
     }
   }
   // случайное модальное событие — выбор из пула
-  if(w>=5 && S.modalQueue.length===0 && Math.random()<0.16){
+  if(w>=3 && S.modalQueue.length===0 && Math.random()<0.24){
     const pool = randomEventPool();
     if(pool.length){ queueModal(pick(pool).build()); }
   }
@@ -446,6 +446,55 @@ function randomEventPool(){
         { label:`Купить за ${cost.toLocaleString('ru-RU')}₽`, effect:()=>{ if(S.resources.money>=cost){ S.resources.money-=cost; S.resources.stress=clamp(S.resources.stress-15,0,100); } } },
         { label:'Не сейчас', effect:()=>{} }
       ]};
+    }},
+    { id:'arkadiy_business', build:()=>{
+      const gain = Math.round(rnd(10000,30000));
+      return { title:'Разговор о бизнесе с отцом Аркадием', text:'Аркадий, как обычно, начинает с пары слов о смирении, а заканчивает связями в бизнес-тусовке — обещает свести с нужными людьми.', choices:[
+        { label:'Выслушать и договориться', effect:()=>{ S.resources.money+=gain; S.trust.arkadiy=clamp(S.trust.arkadiy+8,0,100); } },
+        { label:'Отделаться от нравоучений', effect:()=>{ S.trust.arkadiy=clamp(S.trust.arkadiy-4,0,100); } }
+      ]};
+    }},
+    { id:'arkadiy_choir', build:()=>{
+      return { title:'Церковный хор', text:'Аркадий зовёт на спевку — говорит, помогает привести мысли в порядок, даже если в бога особо не веришь.', choices:[
+        { label:'Сходить', effect:()=>{ S.resources.stress=clamp(S.resources.stress-10,0,100); S.trust.arkadiy=clamp(S.trust.arkadiy+6,0,100); } },
+        { label:'Не сегодня', effect:()=>{} }
+      ]};
+    }},
+    { id:'arkadiy_bar', build:()=>{
+      return { title:'Бар с Аркадием', text:'Аркадий зовёт в бар — сам берёт что покрепче, Данилу заказывает морс и с абсолютно серьёзным лицом рассказывает, как совмещает амвон с утренними встречами с инвесторами.', choices:[
+        { label:'Посидеть, послушать', effect:()=>{ S.resources.stress=clamp(S.resources.stress-6,0,100); S.trust.arkadiy=clamp(S.trust.arkadiy+5,0,100); } },
+        { label:'Отговориться делами', effect:()=>{} }
+      ]};
+    }},
+    { id:'vlados_party', build:()=>{
+      return { title:'Вписка у Владоса', text:'Владос устраивает вписку на весь этаж — бас такой, что дрожат стены. Комендантша уже поглядывает в их сторону.', choices:[
+        { label:'Остаться на вписке', effect:()=>{ S.resources.stress=clamp(S.resources.stress-10,0,100); S.trust.vlados=clamp(S.trust.vlados+8,0,100); S.trust.komendant=clamp(S.trust.komendant-5,0,100); } },
+        { label:'Свалить пораньше', effect:()=>{ S.trust.vlados=clamp(S.trust.vlados-3,0,100); } }
+      ]};
+    }},
+    { id:'vlados_scheme', build:()=>{
+      const gain = Math.round(rnd(25000,80000));
+      return { title:'Мутная тема Владоса', text:'Владос предлагает поучаствовать в разовой теме — что за товар, лучше не спрашивать. Деньги быстрые, но спалиться реально.', choices:[
+        { label:'Согласиться', effect:()=>{
+            const risky = Math.random()<0.4;
+            if(risky){ S.resources.stress=clamp(S.resources.stress+15,0,100); S.trust.vlados=clamp(S.trust.vlados-8,0,100); }
+            else { S.resources.money+=gain; S.trust.vlados=clamp(S.trust.vlados+10,0,100); }
+          } },
+        { label:'Не подписываться', effect:()=>{} }
+      ]};
+    }},
+    { id:'vlados_girls', build:()=>{
+      return { title:'Владос тащит знакомиться', text:'Владос говорит, что Данилу пора «разгружаться», а не сидеть в комнате с книжками, и тащит на район знакомиться.', choices:[
+        { label:'Сходить', effect:()=>{ S.resources.stress=clamp(S.resources.stress-12,0,100); S.trust.vlados=clamp(S.trust.vlados+5,0,100); } },
+        { label:'Остаться дома', effect:()=>{} }
+      ]};
+    }},
+    { id:'vlados_trouble', build:()=>{
+      const cost = Math.round(rnd(10000,25000));
+      return { title:'Владос влип', text:`Владос влип в разборки и просит перехватить ${cost.toLocaleString('ru-RU')}₽, чтобы всё уладилось тихо.`, choices:[
+        { label:'Помочь', effect:()=>{ S.resources.money=Math.max(0,S.resources.money-cost); S.trust.vlados=clamp(S.trust.vlados+12,0,100); } },
+        { label:'Не в этот раз', effect:()=>{ S.trust.vlados=clamp(S.trust.vlados-8,0,100); } }
+      ]};
     }}
   ];
   if(S.dronesUnlocked){
@@ -453,6 +502,15 @@ function randomEventPool(){
       { label:'Свести к шутке', effect:()=>{} },
       { label:'Насторожиться', effect:()=>{ S.resources.stress=clamp(S.resources.stress+4,0,100); } }
     ]}) });
+  }
+  if(S.trust.arkadiy>=40){
+    pool.push({ id:'arkadiy_conference', build:()=>{
+      const gain = Math.round(rnd(40000,90000));
+      return { title:'«Россия — страна возможностей»', text:'Аркадий пробивает Данилу место на молодёжном бизнес-форуме в местном бизнес-центре. Связи серьёзные, но и вложиться временем придётся.', choices:[
+        { label:'Поехать', effect:()=>{ S.resources.money+=gain; S.trust.arkadiy=clamp(S.trust.arkadiy+10,0,100); S.trust.upp=clamp(S.trust.upp+5,0,100); } },
+        { label:'Не поехать — жалко времени', effect:()=>{} }
+      ]};
+    }});
   }
   return pool;
 }
@@ -690,7 +748,7 @@ function render(){
 
   app.innerHTML = `
     <h1>Деканат — менеджмент-версия</h1>
-    <p class="subtitle">Неделя ${S.week} / ${MAX_WEEKS} · Директор общежития: ${S.directorName} · <span class="status-badge ${S.studentStatus?'ok':'bad'}">${S.studentStatus? 'Студент' : 'Отчислен'}</span></p>
+    <p class="subtitle">Неделя ${S.week} / ${MAX_WEEKS} · Директор института: ${S.directorName} · <span class="status-badge ${S.studentStatus?'ok':'bad'}">${S.studentStatus? 'Студент' : 'Отчислен'}</span></p>
 
     <div class="topbar">
       ${statCard('Деньги', r.money.toLocaleString('ru-RU')+'₽', Math.min(100,r.money/100000), false)}
