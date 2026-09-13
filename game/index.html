@@ -32,13 +32,32 @@
   body{
     margin:0;
     padding:16px;
+    min-height:100vh;
     background:var(--bg);
     color:var(--text);
     font-family:var(--sans);
     filter:hue-rotate(var(--hue)) saturate(var(--sat));
     transition:filter 1.2s ease;
+    position:relative;
+  }
+  body::before{
+    content:"";
+    position:fixed;inset:0;
+    z-index:-1;
+    background-image:linear-gradient(rgba(15,17,21,.72),rgba(15,17,21,.9)),url('assets/dorm.jpg');
+    background-size:cover;
+    background-position:center 30%;
+    background-repeat:no-repeat;
   }
   .app{max-width:1220px;margin:0 auto;position:relative;}
+  .bgm-toggle{
+    position:fixed;right:16px;bottom:16px;z-index:60;
+    width:44px;height:44px;border-radius:50%;
+    background:var(--panel);border:1px solid var(--border);color:var(--text-dim);
+    font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 10px rgba(0,0,0,.4);
+  }
+  .bgm-toggle.playing{color:var(--accent);border-color:var(--accent);}
   .app::after{
     content:"";
     position:fixed;inset:0;
@@ -177,6 +196,8 @@
 </head>
 <body>
 <div class="app" id="app"></div>
+<audio id="bgm" src="assets/track.mp3" loop preload="none"></audio>
+<button class="bgm-toggle" id="bgm-toggle" onclick="toggleMusic()" aria-label="Включить/выключить музыку" title="Криминальный бит — Рассвет">♪</button>
 
 <script>
 /* ============ КОНСТАНТЫ ============ */
@@ -1178,6 +1199,20 @@ function attachSliderHandlers(){
   document.querySelectorAll('.npc-slider').forEach(el=>{
     el.addEventListener('input', e=> setRelation(e.target.dataset.npc, e.target.value));
   });
+}
+
+/* ============ ФОНОВАЯ МУЗЫКА ============ */
+function toggleMusic(){
+  const audio = document.getElementById('bgm');
+  const btn = document.getElementById('bgm-toggle');
+  if(!audio || !btn) return;
+  if(audio.paused){
+    audio.play().catch(()=>{});
+    btn.classList.add('playing'); btn.textContent='❚❚';
+  } else {
+    audio.pause();
+    btn.classList.remove('playing'); btn.textContent='♪';
+  }
 }
 
 render();
