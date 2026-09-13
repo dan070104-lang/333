@@ -88,7 +88,7 @@
   .status-badge.bad{background:rgba(168,67,74,.2);color:var(--bad);}
   .status-badge.neutral{background:rgba(150,160,180,.15);color:var(--text-dim);}
   .topbar{
-    display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;
+    display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px;
   }
   .stat{
     background:var(--panel);border:1px solid var(--border);border-radius:10px;
@@ -274,6 +274,9 @@ const SCHEMES = {
     onSuccess:(lines)=>{ if(Math.random()<0.3){ S.trust.director=clamp(S.trust.director+3,0,100); lines.push('Фирма — партнёр института: хорошая работа долетела до администрации, доверие директора +3.'); } } },
   transcription:{ label:'Транскрибация лекций на бирже фриланса', cat:'legal', low:2000, high:6000, fail:0.05,
     onFail:(lines)=>{ lines.push('Транскрибация: заказчик отменил задание на середине файла.'); } },
+  marketing:{ label:'Таргетированная реклама на заказ (SMM-подряды)', cat:'legal', low:4000, high:13000, fail:0.10,
+    onFail:(lines)=>{ lines.push('SMM-подряд: слил бюджет клиента не на ту аудиторию — переделка бесплатно, оплаты нет.'); },
+    onSuccess:(lines)=>{ if(Math.random()<0.25){ lines.push('Кампания зашла — заказчик обещал рекомендовать дальше.'); } } },
   fake_certs:{ label:'Справки об успеваемости через Telegram-бота', cat:'gray', low:15000, high:50000, fail:0.30,
     onFail:(lines)=>{ S.trust.director=clamp(S.trust.director-12,0,100); S.resources.tails=clamp(S.resources.tails+10,0,100);
       lines.push('Справки: подделку заметили — доверие директора −12, хвосты +10.'); } },
@@ -287,6 +290,10 @@ const SCHEMES = {
   crypto:{ label:'Крипто-трейдинг по сигналам знакомого', cat:'gray', low:20000, high:100000, fail:0.45,
     onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(20000*scale*0.5)); S.resources.money=Math.max(0,S.resources.money-lost);
       lines.push(`Крипто-трейдинг: график ушёл не в ту сторону — минус ${fmt(lost)}₽ вложенного.`); } },
+  traffic_arbitrage:{ label:'Арбитраж трафика (слив на CPA-офферы)', cat:'gray', low:12000, high:55000, fail:0.32,
+    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(8000*scale*0.35)); S.resources.money=Math.max(0,S.resources.money-lost);
+      lines.push(`Арбитраж трафика: рекламный кабинет забанили на середине слива — минус ${fmt(lost)}₽ бюджета, профита нет.`); },
+    onSuccess:(lines)=>{ if(Math.random()<0.2){ lines.push('Связка зашла лучше ожиданий — заливать в неё ещё имеет смысл.'); } } },
   investclub:{ label:'Онлайн-инвестклуб в Telegram', cat:'scam', low:50000, high:400000, fail:0.80,
     onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(50000*scale*0.6)); S.resources.money=Math.max(0,S.resources.money-lost);
       S.resources.stress=clamp(S.resources.stress+18,0,100);
@@ -305,8 +312,8 @@ const SCHEMES = {
     onSuccess:(lines)=>{ S.trust.vlados=clamp(S.trust.vlados+6,0,100); lines.push('Дроп-схема: прогнали чисто, Владос это ценит — доверие Владоса +6.'); },
     criminal:15 }
 };
-const LEGAL_IDS = ['doc_translation','tutoring','copywriting','transcription'];
-const GRAY_IDS = ['fake_certs','dropshipping','leaked_tests','crypto'];
+const LEGAL_IDS = ['doc_translation','tutoring','copywriting','transcription','marketing'];
+const GRAY_IDS = ['fake_certs','dropshipping','leaked_tests','crypto','traffic_arbitrage'];
 const SCAM_IDS = ['investclub','nft_pump','vlados_match'];
 
 function sample(arr, n){
@@ -328,6 +335,14 @@ function availableSchemeIds(){
   if(S.vladosUnlocked) ids.push('vlados_deal');
   return ids;
 }
+// Навыки повышают доходность всех схем, но нелегальные (серые/скам/криминал) выигрывают от них
+// заметно сильнее, чем легальный фриланс — навык "прокачки" в первую очередь про умение вести
+// рискованные схемы, а не про честную работу, которая и так тарифицируется рынком.
+function skillBonus(cat){
+  const skill = S.resources.skill;
+  const isLegal = cat==='legal';
+  return { incomeBonus: skill/100*(isLegal?0.15:0.45), failCut: skill/100*(isLegal?0.15:0.5) };
+}
 function schemeParams(id, units, tier){
   const s = SCHEMES[id];
   const eff = effectiveUnits(units);
@@ -339,6 +354,10 @@ function schemeParams(id, units, tier){
     low*=mult; high*=mult;
   }
   if(s.cat!=='legal') fail = clamp(fail + 0.015*(tier-1), 0, 0.9);
+  const sb = skillBonus(s.cat);
+  low *= (1+sb.incomeBonus); high *= (1+sb.incomeBonus);
+  if(S.shop.laptop){ low*=1.05; high*=1.05; }
+  fail = clamp(fail*(1-sb.failCut), 0, 0.95);
   fail = clamp(fail*diff().failMult, 0, 0.95);
   return { low, high, fail, scale };
 }
@@ -403,14 +422,14 @@ function freshState(difficultyLevel){
     kryakovtsevFirstExpulsionUsed: false,
     kryakovtsevResignWeek: null,
     mobilizationAnnounced: false,
-    resources: { money: DIFFICULTY_PRESETS[level].startMoney, stress: 25, food: 60, tails: 8, escalation: 0, criminalRisk: 0 },
+    resources: { money: DIFFICULTY_PRESETS[level].startMoney, stress: 25, food: 60, tails: 8, escalation: 0, criminalRisk: 0, skill: 15 },
     trust: { director:50, zemlekop:50, upp:45, vlados:0, arkadiy:0, kondratyuk:82 },
     crisisCounters: { tails:0, food:0, lifeNeglect:0 },
     firedEvents: {},
     modal: null,
     chainedModal: null,
     pendingEventTurn: null,
-    allocation: { study:4, income:4, life:4, relations:0, relief:0 },
+    allocation: { study:4, income:4, life:4, relations:0, relief:0, skill:0 },
     incomeScheme: 'doc_translation',
     relationSplit: { director:0, zemlekop:0, upp:0, vlados:0, arkadiy:0, kondratyuk:0 },
     shop: {},
@@ -425,13 +444,13 @@ let S = freshState();
 /* ============ ПРАВИЛА БЮДЖЕТА ============ */
 function budgetFor(){ return BASE_BUDGET; }
 function minLifeFor(){ return escalationTier(S.resources.escalation) >= 4 ? diff().minLifeTier4 : 0; }
-function allocSum(a){ return a.study+a.income+a.life+a.relations+a.relief; }
+function allocSum(a){ return a.study+a.income+a.life+a.relations+a.relief+a.skill; }
 
 /* ============ ХОД РАСПРЕДЕЛЕНИЯ (недельная математика) ============ */
 function resolveAllocTurn(){
   const a = S.allocation;
   const tier = escalationTier(S.resources.escalation);
-  const lines = { money:[], stress:[], food:[], tails:[], trust:[], flags:[] };
+  const lines = { money:[], stress:[], food:[], tails:[], trust:[], skill:[], flags:[] };
 
   // Учёба -> хвосты. Программа тяжелеет к концу семестра — фиксированная раскладка юнитов
   // со временем перестаёт справляться, нужно наращивать вложение.
@@ -517,6 +536,19 @@ function resolveAllocTurn(){
   const stressBefore = S.resources.stress;
   S.resources.stress = clamp(S.resources.stress + stressChange, 0, 100);
   lines.stress.push(`${stressBefore}→${S.resources.stress} (${parts.join(', ')})`);
+
+  // Навыки — растут от вложенных юнитов (эффект копится навсегда, не сбрасывается по неделям),
+  // без практики медленно ржавеют. Особенно окупаются на нелегальных схемах заработка.
+  const skillUnits = a.skill||0;
+  const skillBefore = S.resources.skill;
+  if(skillUnits>0){
+    const skillGain = Math.round(effectiveUnits(skillUnits)*2.4);
+    S.resources.skill = clamp(S.resources.skill+skillGain,0,100);
+    lines.skill.push(`${skillBefore}→${S.resources.skill} (+${skillGain}, вложено ${skillUnits})`);
+  } else {
+    S.resources.skill = clamp(S.resources.skill-1,0,100);
+    lines.skill.push(`${skillBefore}→${S.resources.skill} (−1, без практики)`);
+  }
 
   // Отношения — дрейф и адресная подпитка
   Object.keys(NPC_LABELS).forEach(k=>{
@@ -1212,6 +1244,7 @@ function render(){
       <p class="subtitle">${turnLabel} · ${weekLabel} · Ход события · Директор института: ${S.directorName}</p>
       <div class="topbar">
         ${statCard('Деньги', fmt(r.money)+'₽', Math.min(100,r.money/100000), false)}
+        ${statCard('Навыки', r.skill, r.skill, false)}
         ${statCard('Стресс', r.stress, r.stress, true)}
         ${statCard('Шаурма', r.food, r.food, false)}
         ${statCard('Хвосты', r.tails, r.tails, true)}
@@ -1235,6 +1268,7 @@ function render(){
 
     <div class="topbar">
       ${statCard('Деньги', fmt(r.money)+'₽', Math.min(100,r.money/100000), false)}
+      ${statCard('Навыки', r.skill, r.skill, false)}
       ${statCard('Стресс', r.stress, r.stress, true)}
       ${statCard('Шаурма', r.food, r.food, false)}
       ${statCard('Хвосты', r.tails, r.tails, true)}
@@ -1255,6 +1289,7 @@ function render(){
           ${sliderRow('study','Учёба', S.allocation.study)}
           ${sliderRow('income','Заработок', S.allocation.income)}
           ${schemeGroups()}
+          ${sliderRow('skill','Навыки', S.allocation.skill)}
           ${sliderRow('life','Быт', S.allocation.life)}
           <div class="warn-inline" id="minlife-warning" ${(minLifeFor()>0 && S.allocation.life<minLifeFor())?'':'hidden'}>Высокая эскалация требует минимум ${minLifeFor()} юнита на быт.</div>
           ${sliderRow('relations','Отношения', S.allocation.relations)}
@@ -1313,6 +1348,7 @@ function renderReport(){
     sec('Быт', L.food),
     sec('Хвосты', L.tails),
     sec('Отношения', L.trust),
+    sec('Навыки', L.skill),
     sec('Фон', L.flags)
   ].filter(Boolean).join('\n');
 }
@@ -1322,10 +1358,12 @@ function forecastInnerHtml(){
   const forecast = (S.allocation.income>0 && S.incomeScheme && SCHEMES[S.incomeScheme]) ? schemeParams(S.incomeScheme, S.allocation.income, tier) : null;
   if(!forecast) return 'Юниты в «Заработок» не вложены или схема не выбрана — дохода не будет.';
   const s = SCHEMES[S.incomeScheme];
+  const sb = skillBonus(s.cat);
   return `${s.label}, ${S.allocation.income} юнита вложено →<br>
     прогноз: <span class="num">${fmt(forecast.low)}–${fmt(forecast.high)}₽</span><br>
     риск провала: <span class="risk">~${Math.round(forecast.fail*100)}%</span>
     ${s.cat==='legal' && tier>=2 ? `<div class="tier-note">Легальный рынок просел из-за эскалации.</div>`:''}
+    ${S.resources.skill>0 ? `<div class="tier-note">Навыки (${S.resources.skill}) уже дают доход ×${(1+sb.incomeBonus).toFixed(2)}, риск ×${(1-sb.failCut).toFixed(2)}${s.cat!=='legal'?' — на нелегальном заработке навык окупается сильнее':''}.</div>`:''}
     ${s.criminal ? `<div class="tier-note">Участие повышает уголовный риск независимо от исхода.</div>`:''}`;
 }
 
@@ -1382,7 +1420,7 @@ function statCard(label, value, pct, invert){
     <div class="bar"><i style="width:${clamp(pct,0,100)}%;background:${barColor(pct,invert)}"></i></div>
   </div>`;
 }
-const ALLOC_LABELS = { study:'Учёба', income:'Заработок', life:'Быт', relations:'Отношения', relief:'Разгрузка' };
+const ALLOC_LABELS = { study:'Учёба', income:'Заработок', life:'Быт', relations:'Отношения', relief:'Разгрузка', skill:'Навыки' };
 function sliderRow(key,label,value){
   const eff = effectiveUnits(value).toFixed(1);
   return `<div class="slider-row">
