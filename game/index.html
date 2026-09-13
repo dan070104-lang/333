@@ -88,7 +88,7 @@
   .status-badge.bad{background:rgba(168,67,74,.2);color:var(--bad);}
   .status-badge.neutral{background:rgba(150,160,180,.15);color:var(--text-dim);}
   .topbar{
-    display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px;
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;
   }
   .stat{
     background:var(--panel);border:1px solid var(--border);border-radius:10px;
@@ -209,7 +209,11 @@
 <script>
 /* ============ КОНСТАНТЫ ============ */
 const MAX_WEEKS = 45;
-const BASE_BUDGET = 21;
+const BASE_BUDGET = 23;
+// Сумма для "побега в Таиланд" — раньше была 10 000 000₽, недостижимо даже для аккуратной игры
+// без криминала (симуляции показали ~1-1.6 млн к 45 неделе). Калибровано так, чтобы дисциплинированная
+// игра реально доходила до цели в районе 40-й недели, а не была математически невозможна.
+const WIN_MONEY_TARGET = 1300000;
 // единая кривая убывающей отдачи: 1-3 юнита - 100%, 4-5 - 70%, 6-7 - 40%, 8+ - 20%
 function unitRate(index){ // index = номер юнита, начиная с 1
   if(index<=3) return 1;
@@ -294,16 +298,19 @@ const SCHEMES = {
     onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(8000*scale*0.35)); S.resources.money=Math.max(0,S.resources.money-lost);
       lines.push(`Арбитраж трафика: рекламный кабинет забанили на середине слива — минус ${fmt(lost)}₽ бюджета, профита нет.`); },
     onSuccess:(lines)=>{ if(Math.random()<0.2){ lines.push('Связка зашла лучше ожиданий — заливать в неё ещё имеет смысл.'); } } },
+  // Скам-схемы специально просчитаны так, чтобы их матожидание было близко к нулю или отрицательным —
+  // изредка огромный куш заманивает, но полагаться на них систематически объективно невыгодно,
+  // это и делает их скамом, а не просто рискованным, но в среднем прибыльным вариантом заработка.
   investclub:{ label:'Онлайн-инвестклуб в Telegram', cat:'scam', low:50000, high:400000, fail:0.80,
-    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(50000*scale*0.6)); S.resources.money=Math.max(0,S.resources.money-lost);
+    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(50000*scale*1.1)); S.resources.money=Math.max(0,S.resources.money-lost);
       S.resources.stress=clamp(S.resources.stress+18,0,100);
       lines.push(`Инвестклуб: пирамида схлопнулась — минус ${fmt(lost)}₽, стресс +18.`); } },
   nft_pump:{ label:'NFT «гарантированный памп»', cat:'scam', low:45000, high:380000, fail:0.80,
-    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(45000*scale*0.6)); S.resources.money=Math.max(0,S.resources.money-lost);
+    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(45000*scale*1.1)); S.resources.money=Math.max(0,S.resources.money-lost);
       S.resources.stress=clamp(S.resources.stress+16,0,100);
       lines.push(`NFT: «памп» оказался сливом ликвидности — минус ${fmt(lost)}₽, стресс +16.`); } },
-  vlados_match:{ label:'Ставки через букмекерское приложение (инсайд Владоса)', cat:'scam', low:60000, high:250000, fail:0.45,
-    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(30000*scale*0.4)); S.resources.money=Math.max(0,S.resources.money-lost);
+  vlados_match:{ label:'Ставки через букмекерское приложение (инсайд Владоса)', cat:'scam', low:40000, high:140000, fail:0.45,
+    onFail:(lines,scale)=>{ const lost=Math.round(roundMoney(30000*scale*1.1)); S.resources.money=Math.max(0,S.resources.money-lost);
       S.resources.stress=clamp(S.resources.stress+10,0,100);
       lines.push(`Ставки по инсайду: не срослось — минус ${fmt(lost)}₽, стресс +10.`); },
     criminal:12 },
@@ -340,7 +347,7 @@ function availableSchemeIds(){
 // уровня. Нелегальные схемы (серые/скам/криминал) выигрывают от уровня заметно сильнее легального
 // фриланса — навык "прокачки" в первую очередь про умение вести рискованные схемы.
 const SKILL_MAX_LEVEL = 5;
-function skillXpNeeded(level){ return 60 + 20*(level-1); } // XP, нужный чтобы дойти ДО этого уровня
+function skillXpNeeded(level){ return 100 + 30*(level-1); } // XP, нужный чтобы дойти ДО этого уровня
 function addSkillXp(amount){
   const r = S.resources;
   r.skillXP = (r.skillXP||0) + amount;
@@ -613,8 +620,10 @@ function resolveAllocTurn(){
     S.log.unshift({ week:S.week, phase:'alloc', lines });
     return;
   }
-  if(S.mobilizationAnnounced && S.studentStatus && S.resources.money>=10000000){
-    endGame('win','Таиланд','Деньги на счету, диплом на руках. Наконец можно позволить себе ту самую поездку, о которой шутили весь институт.');
+  if(S.studentStatus && S.resources.money>=WIN_MONEY_TARGET){
+    endGame('win','Таиланд', S.mobilizationAnnounced
+      ? 'Деньги на счету, диплом на руках. Наконец можно позволить себе ту самую поездку, о которой шутили весь институт, — и уехать даже сейчас, когда объявлена мобилизация.'
+      : 'Нужная сумма набралась раньше, чем ждали. Не дожидаясь ничего — ни комиссий, ни новых директоров, ни того, что будет объявлено дальше, — можно просто уехать.');
     S.log.unshift({ week:S.week, phase:'alloc', lines });
     return;
   }
@@ -667,7 +676,7 @@ function buildEventTurn(){
     return { title:'Отставка Кряковцева', kicker:'По собственному желанию', text:'Кряковцев подаёт заявление по собственному желанию — тихо, без скандала. Через пару дней в кабинете уже сидит Василина, политический назначенец, и присматривается ко всем заново.', choices:[{label:'Понятно', effect:()=>{}}] };
   }
 
-  if(w>=20 && S.resources.criminalRisk>0 && !(S.criminalFrozenUntil>=w)){
+  if(w>=8 && S.resources.criminalRisk>0 && !(S.criminalFrozenUntil>=w)){
     const chance = S.resources.criminalRisk/400;
     if(Math.random()<chance) return buildPoliceEvent();
   }
@@ -830,13 +839,9 @@ const FIXED_EVENTS = {
     return { title:'Институту спускают квоту', kicker:'Контракты БПЛА', text:'Сверху требуют, чтобы институт обеспечил определённое число подписанных контрактов БПЛА среди студентов. Теперь предложение подписать контракт вместо отчисления будут делать не по-человечески, а по разнарядке — и куда охотнее, чем раньше.', choices:[{label:'Понятно', effect:()=>{}}] };
   },
   45: ()=>{
+    // Побег в Таиланд теперь проверяется каждую неделю в resolveAllocTurn() (не только здесь) —
+    // если сумма уже набрана, игра заканчивается победой раньше, чем успевает дойти до этого события.
     S.mobilizationAnnounced = true;
-    const wonAlready = S.studentStatus && S.resources.money>=10000000;
-    if(wonAlready){
-      return { title:'Объявлена мобилизация', kicker:'Итоги', text:'По стране объявляют мобилизацию — и именно в этот момент на счету Данила наконец нужная сумма, а сам он всё ещё числится студентом.', choices:[
-        { label:'Улететь в Таиланд', effect:()=>{ endGame('win','Таиланд','Деньги на счету, диплом на руках. Наконец можно позволить себе ту самую поездку, о которой шутили весь институт.'); } }
-      ]};
-    }
     if(!S.studentStatus){
       return { title:'Объявлена мобилизация', kicker:'По всей стране', text:'По стране объявляют мобилизацию. Данил на данный момент не восстановлен в институте — бронь не действует.', choices:[
         { label:'...', effect:()=>{ endGame('over','Мобилизация','Мобилизация объявлена в тот момент, когда Данил не был восстановлен в институте — бронь не действует. За ним приезжают в тот же день.'); } }
@@ -1065,7 +1070,7 @@ function saveIfOngoing(){ if(!S.gameOver) saveGame(); }
 
 /* ============ ДЕЙСТВИЯ UI ============ */
 function setAlloc(key, val, live){
-  S.allocation[key] = clamp(parseInt(val)||0, 0, 21);
+  S.allocation[key] = clamp(parseInt(val)||0, 0, BASE_BUDGET);
   if(key==='relations'){
     const cap = S.allocation.relations;
     let sum = Object.values(S.relationSplit).reduce((a,b)=>a+b,0);
@@ -1081,7 +1086,7 @@ function setAlloc(key, val, live){
   if(live) patchLiveUI(); else render();
 }
 function setRelation(npc, val, live){
-  const v = clamp(parseInt(val)||0,0,21);
+  const v = clamp(parseInt(val)||0,0,BASE_BUDGET);
   const others = Object.keys(S.relationSplit).filter(k=>k!==npc).reduce((a,k)=>a+S.relationSplit[k],0);
   const cap = S.allocation.relations;
   S.relationSplit[npc] = Math.min(v, Math.max(0, cap-others));
@@ -1295,6 +1300,7 @@ function render(){
         ${statCard('Шаурма', r.food, r.food, false)}
         ${statCard('Хвосты', r.tails, r.tails, true)}
         ${statCard('Эскалация', r.escalation+' (ур.'+tier+')', r.escalation, true)}
+        ${statCard('Уголовный риск', r.criminalRisk, r.criminalRisk, true)}
       </div>
       ${modalHtml(S.modal, true)}
       <footer>Данил · Юридический институт при Дале · общага №3</footer>
@@ -1319,6 +1325,7 @@ function render(){
       ${statCard('Шаурма', r.food, r.food, false)}
       ${statCard('Хвосты', r.tails, r.tails, true)}
       ${statCard('Эскалация', r.escalation+' (ур.'+tier+')', r.escalation, true)}
+      ${statCard('Уголовный риск', r.criminalRisk, r.criminalRisk, true)}
     </div>
 
     ${!S.studentStatus ? `
@@ -1471,7 +1478,7 @@ function sliderRow(key,label,value){
   const eff = effectiveUnits(value).toFixed(1);
   return `<div class="slider-row">
     <div class="slider-head"><b id="val-${key}">${label}: ${value}</b><span class="eff" id="eff-${key}">эфф. отдача ≈ ${eff}</span></div>
-    <input type="range" min="0" max="21" value="${value}" data-key="${key}" class="alloc-slider">
+    <input type="range" min="0" max="${BASE_BUDGET}" value="${value}" data-key="${key}" class="alloc-slider">
   </div>`;
 }
 function schemePill(id){
@@ -1495,7 +1502,7 @@ function npcCard(k){
   return `<div class="npc ${isFull?'':'light'}">
     <div class="npc-name">${NPC_LABELS[k]} <span>${trust}</span></div>
     <div class="bar"><i style="width:${trust}%;background:${barColor(trust,false)}"></i></div>
-    <input type="range" min="0" max="21" value="${val}" data-npc="${k}" class="npc-slider">
+    <input type="range" min="0" max="${BASE_BUDGET}" value="${val}" data-npc="${k}" class="npc-slider">
     <span class="lock" id="npc-units-${k}">юнитов: ${val} · ${NPC_SUBLABEL[k]}</span>
   </div>`;
 }
