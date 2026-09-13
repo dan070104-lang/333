@@ -378,7 +378,7 @@ function freshState(){
     kryakovtsevPromise: null, // { resolveWeek }
     resources: { money: 4000, stress: 25, food: 60, tails: 8, escalation: 0, criminalRisk: 0 },
     trust: { director:50, zemlekop:50, upp:45, vlados:0, arkadiy:0, kondratyuk:82 },
-    crisisCounters: { tails:0, food:0 },
+    crisisCounters: { tails:0, food:0, lifeNeglect:0 },
     firedEvents: {},
     modal: null,
     pendingEventTurn: null,
@@ -436,20 +436,24 @@ function resolveAllocTurn(){
   }
   S.resources.money = Math.max(0, S.resources.money + moneyTotal);
 
-  // Быт -> покупка еды (деньги) + сытость
+  // Быт -> объём закупки еды определяют ЮНИТЫ, деньги — реальный лимит того, сколько из этого объёма
+  // получится купить. Плюс налаженный быт немного помогает и со стрессом (самоуход), не только с едой.
   const effLife = effectiveUnits(a.life);
-  const lifeQuality = clamp(effLife/3.7, 0, 1); // 0..1, насколько эффективно тратит время на быт
-  const foodCost = Math.round((3000 - 1500*lifeQuality) * priceMult(S.resources.escalation));
-  const targetGain = 26;
-  const decay = Math.round(rnd(8,14) + 3*weekFrac);
-  const affordable = Math.min(foodCost, S.resources.money);
-  const spendRatio = foodCost>0 ? affordable/foodCost : 0;
-  const foodGain = Math.round(targetGain*spendRatio);
+  const foodTarget = Math.round(effLife*7) + (S.shop.apartment ? 4 : 0);
+  const costPerPoint = Math.round(95 * priceMult(S.resources.escalation));
+  const desiredCost = foodTarget*costPerPoint;
+  const affordable = Math.min(desiredCost, S.resources.money);
+  const foodGain = desiredCost>0 ? Math.round(foodTarget*(affordable/desiredCost)) : 0;
   S.resources.money = Math.max(0, S.resources.money - affordable);
+  const decay = Math.round(rnd(8,14) + 3*weekFrac);
   const foodBefore = S.resources.food;
   S.resources.food = clamp(S.resources.food - decay + foodGain, 0, 100);
-  lines.food.push(`${foodBefore}→${S.resources.food} (расход −${decay}, закупка +${foodGain} за ${fmt(affordable)}₽)`);
-  if(affordable<foodCost) lines.flags.push(`Не хватило денег на полноценную еду — нужно было ${fmt(foodCost)}₽, потрачено ${fmt(affordable)}₽.`);
+  lines.food.push(`${foodBefore}→${S.resources.food} (расход −${decay}, закупка +${foodGain} из ${foodTarget} желаемых, за ${fmt(affordable)}₽)`);
+  if(affordable<desiredCost) lines.flags.push(`Юнитов «Быта» хватило бы на бо́льшую закупку, но не хватило денег — нужно было ${fmt(desiredCost)}₽, потрачено ${fmt(affordable)}₽.`);
+  const lifeComfort = Math.round(effLife*0.8);
+
+  // Запущенный быт копится — систематическое игнорирование не проходит бесследно
+  S.crisisCounters.lifeNeglect = a.life<=1 ? (S.crisisCounters.lifeNeglect||0)+1 : 0;
 
   // Аренда общаги — периодический флейвор-платёж (не узел доверия)
   if(S.week>=S.rentDueWeek){
@@ -474,9 +478,10 @@ function resolveAllocTurn(){
   const stressBase = Math.round(6 + 6*weekFrac);
   const reliefMult = 1 - 0.05*(tier-1);
   const reliefEffect = Math.round(effRelief*3.2*reliefMult);
-  let stressChange = stressBase - reliefEffect;
-  const parts = [`база +${stressBase}`, `разгрузка −${reliefEffect}`];
+  let stressChange = stressBase - reliefEffect - lifeComfort;
+  const parts = [`база +${stressBase}`, `разгрузка −${reliefEffect}`, `быт −${lifeComfort}`];
   if(S.resources.food===0){ stressChange += 12; parts.push('голод +12'); }
+  else if(S.resources.food<30){ stressChange += 5; parts.push('впроголодь +5'); }
   if(tier===3){ stressChange += 3; parts.push('эскалация +3'); }
   if(tier===4){ stressChange += 6; parts.push('эскалация +6'); }
   if(S.shop.car){ stressChange -= 3; parts.push('машина −3'); }
@@ -567,6 +572,18 @@ function buildEventTurn(){
   if(w>=20 && S.resources.criminalRisk>0 && !(S.criminalFrozenUntil>=w)){
     const chance = S.resources.criminalRisk/400;
     if(Math.random()<chance) return buildPoliceEvent();
+  }
+
+  if(S.crisisCounters.lifeNeglect>=3){
+    S.crisisCounters.lifeNeglect = 0;
+    const fine = Math.round(rnd(6000,15000)*priceMult(S.resources.escalation));
+    return { title:'Запущенная комната', kicker:'Комендантша', text:'Комендантша устраивает разнос — в комнате давно никто не убирался, соседи по этажу жалуются. Можно решить вопрос деньгами, можно получить официальное замечание.', choices:[
+      { label:`Занести ${fmt(fine)}₽`, effect:()=>{
+          if(S.resources.money>=fine){ S.resources.money-=fine; }
+          else { S.resources.stress=clamp(S.resources.stress+15,0,100); }
+        } },
+      { label:'Проигнорировать', effect:()=>{ S.resources.stress=clamp(S.resources.stress+10,0,100); S.rentDueWeek = Math.max(S.week, S.rentDueWeek-1); } }
+    ]};
   }
 
   const pool = randomEventPool();
@@ -692,6 +709,35 @@ function randomEventPool(){
       { label:'Готовиться всю ночь', effect:()=>{ S.resources.stress=clamp(S.resources.stress+8,0,100); S.resources.tails=clamp(S.resources.tails-6,0,100); } },
       { label:'Понадеяться на удачу', effect:()=>{ S.resources.tails=clamp(S.resources.tails+8,0,100); } }
     ]})},
+    { id:'water_outage', build:()=>{ const cost=Math.round(rnd(1500,3500)); return { title:'Отключили воду', kicker:'Быт общаги', text:'В блоке на несколько дней отключили горячую воду — «плановые работы», как обычно без предупреждения.', choices:[
+      { label:`Сходить в баню ${fmt(cost)}₽`, effect:()=>{ S.resources.money=Math.max(0,S.resources.money-cost); } },
+      { label:'Перетерпеть', effect:()=>{ S.resources.stress=clamp(S.resources.stress+7,0,100); } }
+    ]};}},
+    { id:'fridge_broken', build:()=>{ const cost=Math.round(rnd(2000,5000)); return { title:'Сломался общий холодильник', kicker:'Быт общаги', text:'Холодильник на этаже накрылся вместе со всеми запасами. Можно скинуться на ремонт вскладчину или просто списать продукты.', choices:[
+      { label:`Скинуться на ремонт ${fmt(cost)}₽`, effect:()=>{ S.resources.money=Math.max(0,S.resources.money-cost); } },
+      { label:'Списать продукты', effect:()=>{ S.resources.food=clamp(S.resources.food-10,0,100); } }
+    ]};}},
+    { id:'block_cleanup', build:()=>({ title:'Генеральная уборка блока', kicker:'Быт общаги', text:'Обязательная приборка перед проверкой из деканата — вечер потерян, зато комендантша довольна.', choices:[
+      { label:'Отработать честно', effect:()=>{ S.resources.stress=clamp(S.resources.stress+4,0,100); S.crisisCounters.lifeNeglect=0; } },
+      { label:'Скинуться, чтобы отмазаться', effect:()=>{ S.resources.money=Math.max(0,S.resources.money-2000); } }
+    ]})},
+    { id:'cockroaches', build:()=>{ const cost=Math.round(rnd(2500,6000)); return { title:'Тараканы', kicker:'Быт общаги', text:'В комнате завелись тараканы — то ли от соседей, то ли от старых объедков. Можно вызвать дезинсектора, можно бороться подручными средствами.', choices:[
+      { label:`Вызвать дезинсектора ${fmt(cost)}₽`, effect:()=>{ S.resources.money=Math.max(0,S.resources.money-cost); } },
+      { label:'Бороться самому', effect:()=>{ S.resources.stress=clamp(S.resources.stress+6,0,100); } }
+    ]};}},
+    { id:'shaurma_closed', build:()=>({ title:'Шаурмичная закрылась на ремонт', kicker:'Питание', text:'Единственная нормальная шаурмичная у общаги закрылась — придётся либо ехать дальше, либо переплачивать в других местах.', choices:[
+      { label:'Понятно', effect:()=>{ S.resources.food=clamp(S.resources.food-8,0,100); } }
+    ]})},
+    { id:'food_poisoning', build:()=>({ title:'Отравился шаурмой', kicker:'Питание', text:'Та самая шаурма из ларька за углом оказалась не лучшей идеей — весь день в обнимку с тазиком.', choices:[
+      { label:'Отлежаться', effect:()=>{ S.resources.food=clamp(S.resources.food-15,0,100); S.resources.stress=clamp(S.resources.stress+8,0,100); } }
+    ]})},
+    { id:'new_shaurma_joint', build:()=>({ title:'Открылась новая шаурмичная', kicker:'Питание', text:'У остановки открылась новая точка — дёшево, вкусно и порции больше обычного.', choices:[
+      { label:'Отличные новости', effect:()=>{ S.resources.food=clamp(S.resources.food+10,0,100); } }
+    ]})},
+    { id:'late_night_shaurma', build:()=>{ const cost=Math.round(rnd(600,1200)); return { title:'Ночной дожор', kicker:'Питание', text:'Два часа ночи, доучиться уже не выйдет — самое время дойти до ларька за шаурмой.', choices:[
+      { label:`Сходить ${fmt(cost)}₽`, effect:()=>{ if(S.resources.money>=cost){ S.resources.money-=cost; S.resources.food=clamp(S.resources.food+8,0,100); S.resources.stress=clamp(S.resources.stress-5,0,100); } } },
+      { label:'Лечь спать голодным', effect:()=>{} }
+    ]};}},
     { id:'stipend_delay', build:()=>{ const loss=Math.round(rnd(3000,8000)); return { title:'Задержка стипендии', kicker:'Деньги', text:'Бухгалтерия снова затянула выплаты.', choices:[
       { label:'Понятно', effect:()=>{ S.resources.money=Math.max(0,S.resources.money-loss); } }
     ]};}},
