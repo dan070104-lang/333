@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Деканат — менеджмент-версия</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Serif:wght@400;700&family=PT+Sans:wght@400;700&family=PT+Mono&display=swap">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=PT+Serif:wght@400;700&family=PT+Sans:wght@400;700&family=PT+Mono&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Serif:wght@400;700&family=PT+Sans:wght@400;700&family=PT+Mono&display=swap"></noscript>
 <style>
   :root{
     /* казённый кабинет после отбоя: холодный тёмный фон, бумажный текст, выцветший штамп-синий */
@@ -163,6 +164,7 @@ const MAX_WEEKS = 45;
 const BASE_BUDGET = 21;
 const DIM_COEF = [1,1,1,0.7,0.4,0.2]; // коэффициенты убывающей отдачи по номеру юнита
 const NPC_LABELS = { zemlekop:'Землекоп', upp:'Комиссия УПП', komendant:'Комендантша', director:'Директор', kondratyuk:'Кондратюк' };
+const TAILS_CRISIS_THRESHOLD = 50; // у Данила и так плохие отношения с деканатом — порог ниже "среднестатистического" (60)
 
 function effectiveUnits(n){
   if(n<=0) return 0;
@@ -187,7 +189,8 @@ function getIncomeParams(units, type, tier){
   let low, high, fail;
   if(type==='legal'){ low=eff*1500; high=eff*4000; fail=Math.min(0.35,0.05+0.01*eff); }
   else if(type==='gray'){ low=eff*2000; high=eff*9000; fail=Math.min(0.6,0.25+0.03*eff); }
-  else { low=eff*4000; high=eff*20000; fail=Math.min(0.78,0.35+0.05*eff); }
+  else if(type==='drone'){ low=eff*5000; high=eff*28000; fail=Math.min(0.8,0.4+0.05*eff); }
+  else { low=eff*4000; high=eff*20000; fail=Math.min(0.78,0.35+0.05*eff); } // scam
   if(type==='legal'){
     let mult=1;
     if(tier===2) mult=0.7; else if(tier===3) mult=0.6; else if(tier===4) mult=0.5;
@@ -209,6 +212,7 @@ function freshState(){
     restorations: 0,
     mobilizationAnnounced: false,
     conscriptionWeek: null,
+    dronesUnlocked: false,
     resources: { money: 4000, stress: 25, food: 65, tails: 8, escalation: 0 },
     trust: { zemlekop:50, upp:45, komendant:55, director:50, kondratyuk:82 },
     crisisCounters: { tails:0, food:0, stress:0 },
@@ -242,6 +246,10 @@ function resolveWeek(){
   if(tailsDelta<0) lines.push(`Учёба: хвосты сократились на ${-tailsDelta}.`);
   else if(tailsDelta>0) lines.push(`Учёба: хвосты выросли на ${tailsDelta} — пар посещалось слишком мало.`);
   else lines.push(`Учёба: без изменений — на грани.`);
+  if(S.resources.tails>=45 && !S.firedEvents.tailsWarning){
+    S.firedEvents.tailsWarning = true;
+    lines.push('Фон: в деканате на Данила и так смотрят косо — таких хвостов, как другим, ему могут не простить.');
+  }
 
   // Заработок
   let moneyDelta = 0;
@@ -250,13 +258,15 @@ function resolveWeek(){
     const failed = Math.random() < p.fail;
     if(failed){
       moneyDelta = Math.round(roundMoney(p.low*0.15));
-      S.resources.stress = clamp(S.resources.stress+10,0,100);
+      const stressPenalty = S.incomeType==='drone' ? 15 : 10;
+      S.resources.stress = clamp(S.resources.stress+stressPenalty,0,100);
       const failText = {
         legal: 'Заказ сорвался, клиент не заплатил вовремя.',
         gray: 'Схема прогорела — пришлось откатывать назад, почти без выхлопа.',
-        scam: 'Разводка не прошла — Данила чуть не спалили, доверие Землекопа просело.'
+        scam: 'Разводка не прошла — Данила чуть не спалили, доверие Землекопа просело.',
+        drone: 'Партия деталей ушла в брак, а перекупщик пропал со связи — деньги почти не отбились.'
       }[S.incomeType];
-      lines.push(`Заработок (${incomeLabel(S.incomeType)}): ${failText} +${moneyDelta.toLocaleString('ru-RU')}₽, стресс +10.`);
+      lines.push(`Заработок (${incomeLabel(S.incomeType)}): ${failText} +${moneyDelta.toLocaleString('ru-RU')}₽, стресс +${stressPenalty}.`);
       if(S.incomeType==='scam'){ S.trust.zemlekop = clamp(S.trust.zemlekop-5,0,100); }
     } else {
       moneyDelta = Math.round(roundMoney(rnd(p.low,p.high)));
@@ -312,7 +322,7 @@ function resolveWeek(){
   S.week += 1;
 
   // Кризисные счётчики
-  S.crisisCounters.tails = S.resources.tails>=60 ? S.crisisCounters.tails+1 : 0;
+  S.crisisCounters.tails = S.resources.tails>=TAILS_CRISIS_THRESHOLD ? S.crisisCounters.tails+1 : 0;
   S.crisisCounters.food = S.resources.food===0 ? S.crisisCounters.food+1 : 0;
   S.crisisCounters.stress = S.resources.stress>=90 ? S.crisisCounters.stress+1 : 0;
 
@@ -327,7 +337,7 @@ function resolveWeek(){
   }
 }
 
-function incomeLabel(t){ return t==='legal'?'легальная': t==='gray'?'серая зона':'скам'; }
+function incomeLabel(t){ return t==='legal'?'легальная': t==='gray'?'серая зона': t==='drone'?'дрон-подряды':'скам'; }
 
 function maybeKondratyukNarrative(lines){
   const k = S.trust.kondratyuk;
@@ -352,10 +362,11 @@ function checkStoryEvents(lines){
   }
   if(w===16 && !S.firedEvents.drones){
     S.firedEvents.drones = true;
+    S.dronesUnlocked = true;
     S.resources.escalation = clamp(S.resources.escalation+8,0,100);
     queueModal({
       title:'БПЛА-контракты',
-      text:'В городе появляются подряды, связанные со сборкой и обслуживанием дронов. Деньги быстрые, но схема заметно рискованнее прежних раскладов серой зоны.',
+      text:'В городе появляются подряды, связанные со сборкой и обслуживанием дронов. Деньги заметно быстрее прежних раскладов серой зоны, но и риск попасть под вопросы — выше. В «Заработке» открывается новая опция.',
       choices:[{label:'Взять на заметку', effect:()=>{}}]
     });
   }
@@ -388,18 +399,62 @@ function checkStoryEvents(lines){
       queueModal({ title:'Проверка призывной комиссии', text:'Списки сверены. Данил всё ещё числится студентом — бронь действует. Пронесло, на этот раз.', choices:[{label:'Выдохнуть', effect:()=>{}}] });
     }
   }
-  // случайное нетворкинг-предложение
-  if(w>=5 && S.modalQueue.length===0 && Math.random()<0.12){
-    const bonus = Math.round(rnd(15000,45000));
-    queueModal({
-      title:'Нетворкинг-предложение',
-      text:`Знакомый предлагает разовую подработку — сразу ${bonus.toLocaleString('ru-RU')}₽ на руки, но нужно потратить вечер и слегка подпортить отношения с кем-то из комиссии УПП (это ударит по доверию).`,
-      choices:[
+  // случайное модальное событие — выбор из пула
+  if(w>=5 && S.modalQueue.length===0 && Math.random()<0.16){
+    const pool = randomEventPool();
+    if(pool.length){ queueModal(pick(pool).build()); }
+  }
+}
+
+function randomEventPool(){
+  const pool = [
+    { id:'networking', build:()=>{
+      const bonus = Math.round(rnd(15000,45000));
+      return { title:'Нетворкинг-предложение', text:`Знакомый предлагает разовую подработку — сразу ${bonus.toLocaleString('ru-RU')}₽ на руки, но нужно потратить вечер и слегка подпортить отношения с кем-то из комиссии УПП.`, choices:[
         { label:'Согласиться', effect:()=>{ S.resources.money+=bonus; S.trust.upp=clamp(S.trust.upp-8,0,100); } },
         { label:'Отказаться', effect:()=>{} }
-      ]
-    });
+      ]};
+    }},
+    { id:'inspection', build:()=>{
+      const cost = Math.round(rnd(3000,8000));
+      return { title:'Внеплановая проверка комнаты', text:`Комендантша грозится внести замечание в личное дело за состояние комнаты. Можно решить вопрос деньгами, можно убрать самому и потерять вечер.`, choices:[
+        { label:`Занести ${cost.toLocaleString('ru-RU')}₽`, effect:()=>{ S.resources.money=Math.max(0,S.resources.money-cost); S.trust.komendant=clamp(S.trust.komendant+6,0,100); } },
+        { label:'Убрать самому', effect:()=>{ S.resources.stress=clamp(S.resources.stress+6,0,100); } }
+      ]};
+    }},
+    { id:'zemlekop_offer', build:()=>{
+      const gain = Math.round(rnd(20000,70000));
+      return { title:'Предложение Землекопа', text:'Землекоп зовёт на разовое дело покрупнее обычного — куш заметно больше стандартных схем, но и внимания к нему сейчас больше, чем обычно.', choices:[
+        { label:'Войти в долю', effect:()=>{
+            const risky = Math.random()<0.4;
+            if(risky){ S.resources.stress=clamp(S.resources.stress+12,0,100); S.trust.zemlekop=clamp(S.trust.zemlekop-10,0,100); }
+            else { S.resources.money+=gain; S.trust.zemlekop=clamp(S.trust.zemlekop+8,0,100); }
+          } },
+        { label:'Не в этот раз', effect:()=>{} }
+      ]};
+    }},
+    { id:'kondratyuk_loan', build:()=>{
+      const amount = Math.round(rnd(5000,20000));
+      return { title:'Кондратюк просит в долг', text:`Кондратюк, смущаясь, просит перехватить ${amount.toLocaleString('ru-RU')}₽ — говорит, что вот-вот всё отобьёт.`, choices:[
+        { label:'Дать в долг', effect:()=>{ S.resources.money=Math.max(0,S.resources.money-amount); S.trust.kondratyuk=clamp(S.trust.kondratyuk+10,0,100); } },
+        { label:'Отказать', effect:()=>{ S.trust.kondratyuk=clamp(S.trust.kondratyuk-6,0,100); } }
+      ]};
+    }},
+    { id:'status_purchase', build:()=>{
+      const cost = Math.round(rnd(15000,35000));
+      return { title:'Статусная покупка', text:'В витрине — вещь, о которой давно думал. Не по средствам, но именно сейчас очень хочется хоть какой-то нормальности.', choices:[
+        { label:`Купить за ${cost.toLocaleString('ru-RU')}₽`, effect:()=>{ if(S.resources.money>=cost){ S.resources.money-=cost; S.resources.stress=clamp(S.resources.stress-15,0,100); } } },
+        { label:'Не сейчас', effect:()=>{} }
+      ]};
+    }}
+  ];
+  if(S.dronesUnlocked){
+    pool.push({ id:'drone_check', build:()=>({ title:'Лишние вопросы', text:'Кто-то из старших курсов спрашивает слишком много деталей о том, откуда у Данила подряды на обслуживание дронов.', choices:[
+      { label:'Свести к шутке', effect:()=>{} },
+      { label:'Насторожиться', effect:()=>{ S.resources.stress=clamp(S.resources.stress+4,0,100); } }
+    ]}) });
   }
+  return pool;
 }
 
 function checkCrises(lines){
@@ -446,7 +501,15 @@ function popModalIfNeeded(){
 function endGame(kind, title, text){
   S.gameOver = { kind, title, text };
   S.ended = true;
+  clearSave();
 }
+
+/* ============ СОХРАНЕНИЕ ПРОГРЕССА (localStorage) ============ */
+const SAVE_KEY = 'dekanat_save_v1';
+function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+function loadGame(){ try{ const raw = localStorage.getItem(SAVE_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; } }
+function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
+function saveIfOngoing(){ if(!S.gameOver) saveGame(); }
 
 function finishGame(){
   const money = S.resources.money;
@@ -498,6 +561,7 @@ function confirmWeek(){
   if(!validAllocation()) return;
   resolveWeek();
   popModalIfNeeded();
+  saveIfOngoing();
   render();
 }
 function validAllocation(){
@@ -511,6 +575,7 @@ function closeModal(choice){
   if(choice && choice.effect) choice.effect();
   S.modal = null;
   popModalIfNeeded();
+  saveIfOngoing();
   render();
 }
 function tryRestore(){
@@ -521,6 +586,7 @@ function tryRestore(){
     S.resources.tails = 50;
     S.restorations += 1;
     S.log.unshift({ week:S.week, text:`Данил восстанавливается в университете за ${cost.toLocaleString('ru-RU')}₽. Хвосты частично сохраняются (50).` });
+    saveIfOngoing();
     render();
   }
 }
@@ -531,8 +597,13 @@ function restoreCost(){
   if(tier===4) base *= 2;
   return Math.round(base/1000)*1000;
 }
-function restartGame(){ S = freshState(); render(); }
-function startGame(){ S.started = true; render(); }
+function restartGame(){ clearSave(); S = freshState(); render(); }
+function startGame(){ clearSave(); S = freshState(); S.started = true; saveGame(); render(); }
+function continueGame(){
+  const saved = loadGame();
+  if(saved){ S = saved; S.started = true; render(); }
+  else startGame();
+}
 
 /* ============ ВИЗУАЛЬНАЯ ДЕГРАДАЦИЯ ============ */
 function applyVisualTier(){
@@ -569,6 +640,7 @@ function render(){
   const app = document.getElementById('app');
 
   if(!S.started){
+    const saved = loadGame();
     app.innerHTML = `
       <h1>Деканат — менеджмент-версия</h1>
       <p class="subtitle">Недельный дашборд управления временем Данила. ${MAX_WEEKS} недель, 21 юнит времени в неделю, никакой прокачки без компромиссов.</p>
@@ -577,11 +649,17 @@ function render(){
         Каждую неделю ты распределяешь ограниченный бюджет юнитов времени между учёбой, заработком, бытом,
         отношениями и разгрузкой. Перекос в одну категорию математически невыгоден — отдача с каждым
         следующим юнитом падает. Кризисы наступают не от одной ошибки, а когда показатели держатся
-        за критическим порогом несколько недель подряд.
+        за критическим порогом несколько недель подряд. У Данила и так натянутые отношения с деканатом —
+        вызов на комиссию грозит раньше, чем среднему студенту.
         </p>
-        <button class="confirm" onclick="startGame()">Начать семестр</button>
+        ${saved ? `
+          <button class="confirm" onclick="continueGame()">Продолжить (неделя ${saved.week})</button>
+          <button class="secondary" style="margin-top:8px;width:100%" onclick="startGame()">Начать заново</button>
+        ` : `
+          <button class="confirm" onclick="startGame()">Начать семестр</button>
+        `}
       </div>
-      <footer>Прототип по GDD «Деканат» — менеджмент-версия. Локальная симуляция, без сервера.</footer>
+      <footer>Прототип по GDD «Деканат» — менеджмент-версия. Локальная симуляция, без сервера. Прогресс сохраняется в этом браузере.</footer>
     `;
     return;
   }
@@ -639,6 +717,7 @@ function render(){
             ${incomePill('legal','Легальная')}
             ${incomePill('gray','Серая зона')}
             ${incomePill('scam','Скам')}
+            ${S.dronesUnlocked ? incomePill('drone','БПЛА-подряды') : ''}
           </div>
           ${sliderRow('life','Быт', S.allocation.life)}
           ${minLifeFor(S)>0 && S.allocation.life<minLifeFor(S) ? `<div class="warn-inline">Высокая эскалация требует минимум ${minLifeFor(S)} юнита на быт.</div>` : ''}
