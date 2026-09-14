@@ -259,7 +259,7 @@ function priceMult(escalation){ return 1 + 0.15*Math.floor(escalation/25); }
 const DIFFICULTY_PRESETS = {
   easy:   { label:'Спокойная общага',  hint:'Больше стартовых денег, схемы надёжнее, давление слабее.', startMoney:15000, pressureMult:0.82, failMult:0.85, criminalMult:0.75, rentMult:0.85, minLifeTier4:4 },
   normal: { label:'Как у всех',        hint:'Баланс по умолчанию — ровно на грани.',                     startMoney:4000,  pressureMult:1,    failMult:1,    criminalMult:1,    rentMult:1,    minLifeTier4:5 },
-  hard:   { label:'Без подстраховки',  hint:'Меньше денег на старте, риски выше, мир жёстче.',            startMoney:1500,  pressureMult:1.18, failMult:1.18, criminalMult:1.35, rentMult:1.18, minLifeTier4:6 }
+  hard:   { label:'Без подстраховки',  hint:'Меньше денег на старте, риски выше, мир жёстче.',            startMoney:2500,  pressureMult:1.10, failMult:1.10, criminalMult:1.20, rentMult:1.10, minLifeTier4:6 }
 };
 function diff(){ return DIFFICULTY_PRESETS[S.difficulty] || DIFFICULTY_PRESETS.normal; }
 function addCriminalRisk(amount){ S.resources.criminalRisk = clamp(S.resources.criminalRisk + amount*diff().criminalMult, 0, 100); }
